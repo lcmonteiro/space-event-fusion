@@ -36,7 +36,7 @@ namespace Resource {
     template <>
     Timer::Timer(
         const std::chrono::steady_clock::time_point& point,
-        const std::chrono::nanoseconds& duration)
+        const std::chrono::milliseconds& duration)
       : Base(timerfd_create(CLOCK_MONOTONIC, 0)) {
         setup(native_(), point, duration);
     }
@@ -44,9 +44,22 @@ namespace Resource {
     template <>
     Timer::Timer(
         const std::chrono::system_clock::time_point& point,
-        const std::chrono::nanoseconds& duration)
+        const std::chrono::milliseconds& duration)
       : Base(timerfd_create(CLOCK_REALTIME, 0)) {
         setup(native_(), point, duration);
+    }
+
+    std::size_t Timer::count() {
+        std::uint64_t u = 0;
+        if (::read(native_(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
+            throw std::runtime_error(std::string("timer count: ") + strerror(errno));
+        return std::size_t(u);
+    }
+
+    void Timer::clear() {
+        std::uint64_t u = 0;
+        if (::read(native_(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
+            throw std::runtime_error(std::string("timer clear: ") + strerror(errno));
     }
 
 } // namespace Resource

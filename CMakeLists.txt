@@ -6,6 +6,7 @@ project(space-event-fusion)
 # space target
 add_library(event-fusion
 	./src/fusion.cpp
+	./src/resources/base.cpp
 	./src/resources/timer.cpp
 )
 

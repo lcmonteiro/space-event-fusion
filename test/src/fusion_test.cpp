@@ -57,14 +57,16 @@ TEST(FusionSpace, positive_test) {
     //     });
     // };
 
-
     Fusion::Space<Fusion::Kernel>([](auto self) {
         Fusion::Scope<Fusion::Resource::Timer>(self, [](auto self, auto home) {
             auto entry_point = [](auto self, auto entry_point) -> void {
                 //entry_point(self, entry_point); 
-                self->wait([&]() { entry_point(self, entry_point); });
+                self->wait([entry_point](auto self, auto home) { 
+                    self->clear();
+                    entry_point(self, entry_point); 
+                });
             };
-            //self->build(std::chrono::system_clock::now(), std::chrono::seconds{1});
+            self->build(std::chrono::system_clock::now(), std::chrono::seconds{1});
             entry_point(self, entry_point);
         });
     });
