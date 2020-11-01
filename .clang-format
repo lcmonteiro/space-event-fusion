@@ -1,6 +1,7 @@
+# disable formatting with // clang-format off
+# enable formatting with  // clang-format on
 BasedOnStyle: LLVM
 Language: Cpp
-
 
 # --- Indentation
 TabWidth: 4
@@ -10,7 +11,7 @@ IndentWidth: 4
 IndentWrappedFunctionNames: false
 ConstructorInitializerIndentWidth: 2
 ContinuationIndentWidth: 4
-AccessModifierOffset: -2 
+AccessModifierOffset: -2 # how far e.g public is indented
 NamespaceIndentation: Inner
 
 # --- Braces
@@ -45,10 +46,10 @@ SpacesInSquareBrackets: false
 MaxEmptyLinesToKeep: 3
 
 # --- Breaks, alignment & reflow
-
 AlignAfterOpenBracket: AlwaysBreak
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: false
+AlignEscapedNewlinesLeft: false
 AlignOperands: false
 AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: false
@@ -61,15 +62,22 @@ BinPackParameters: false
 BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
-BreakConstructorInitializersBeforeComma: true
+BreakInheritanceList: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 PointerAlignment: Left
 ReflowComments: true
 ColumnLimit: 100
 
 # --- Other
-SortIncludes: false
+SortIncludes: true
 ForEachMacros:   [ foreach, Q_FOREACH, BOOST_FOREACH ]
 
 # --- Penalties
-PenaltyBreakAssignment: 100
+PenaltyBreakAssignment: 80
+PenaltyExcessCharacter: 80 
+PenaltyBreakString: 50
+PenaltyReturnTypeOnItsOwnLine: 50 
+PenaltyBreakBeforeFirstCallParameter: 30 
+PenaltyBreakFirstLessLess: 30
+PenaltyBreakTemplateDeclaration: 10 
+PenaltyBreakComment: 10

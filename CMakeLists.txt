@@ -3,10 +3,11 @@ cmake_minimum_required (VERSION 3.13)
 # project
 project(space-event-fusion)
 
+set(CMAKE_CXX_STANDARD 17)
+
 # space target
 add_library(event-fusion
 	./src/fusion.cpp
-	./src/resources/base.cpp
 	./src/resources/timer.cpp
 )
 

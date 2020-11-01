@@ -45,8 +45,45 @@
 // }
 
 
+// #include "fusion.hpp"
+// #include "resources/timer.hpp"
+
+#include <variant>
+#include <functional>
+
+#include <sys/eventfd.h>
+#include <unistd.h>
+
 #include "fusion.hpp"
 #include "resources/timer.hpp"
+
+// namespace fusion {
+// typedef std::function<void()> wait;
+// typedef std::function<void()> next;
+// template <class... Ts>
+// struct overloaded : Ts... {
+//     using Ts::operator()...;
+// };
+// template <class... Ts>
+// overloaded(Ts...) -> overloaded<Ts...>;
+
+// typedef std::function<void(const std::variant<wait>&)> engine;
+
+// auto build(std::shared_ptr<engine> en) {
+//     struct event final {
+//         event()
+//           : h([]() { return eventfd(0, 0); }()) {}
+//         ~event() { close(h); }
+//         const int h;
+//     };
+//     return std::make_shared<engine>(
+//         [en, ev = std::make_shared<event>()](const std::variant<wait>& opt) {
+//             std::visit(overloaded{[](wait w) { std::cout << "wait" << std::endl; }}, opt);
+//         });
+// }
+// } // namespace fusion
+
+
 
 TEST(FusionSpace, positive_test) {
     //
@@ -57,17 +94,66 @@ TEST(FusionSpace, positive_test) {
     //     });
     // };
 
-    Fusion::Space<Fusion::Kernel>([](auto self) {
-        Fusion::Scope<Fusion::Resource::Timer>(self, [](auto self, auto home) {
-            auto entry_point = [](auto self, auto entry_point) -> void {
-                //entry_point(self, entry_point); 
-                self->wait([entry_point](auto self, auto home) { 
-                    self->clear();
-                    entry_point(self, entry_point); 
-                });
-            };
-            self->build(std::chrono::system_clock::now(), std::chrono::seconds{1});
-            entry_point(self, entry_point);
+    // using Variant = std::variant<std::shared_ptr<Base>, std::shared_ptr<Multi>>;
+
+    // //std::shared_ptr<Multi> b1 = std::make_shared<B>();
+    // Variant b = std::make_shared<B>();
+    // auto v = [](auto opt) {
+    //     std::visit(
+    //         fusion::overloaded{
+    //             [](std::shared_ptr<Multi> m) { std::cout << "multi" << std::endl; },
+    //             [](std::shared_ptr<Base> m) { std::cout << "base" << std::endl; }
+    //         },
+    //         opt);
+    // };
+
+    // v(b);
+    // auto r = [s](auto opt) {
+    //     int i = 0;
+    //     std::visit(
+    //         fusion::overloaded{[](fusion::wait w) {
+    //             s([i](auto))
+
+    //             std::cout << "wait" << std::endl; }}, opt);
+    // };
+
+    // auto space = std::make_shared<fusion::engine>([](const std::variant<fusion::wait>& opt) {
+    //     std::visit(
+    //         fusion::overloaded{[](fusion::wait w) { std::cout << "wait" << std::endl; }}, opt);
+    // });
+
+
+    // auto timer = fusion::build(space);
+
+    // timer(fusion::wait([](auto self, auto home) {
+
+    // }));
+
+    // Fusion::Space<Fusion::Kernel>([](auto self) {
+    //     Fusion::Scope<Fusion::Resource::Timer>(self, [](auto self) {
+    //         auto entry_point = [](auto self, auto entry_point) -> void {
+    //             self->wait([entry_point](auto self) {
+    //                 self->clear(self);
+    //                 entry_point(self, entry_point);
+    //             });
+    //         };
+    //         self->build(std::chrono::system_clock::now(), std::chrono::seconds{1});
+    //         entry_point(self, entry_point);
+    //     });
+    // });
+
+    fusion::space<fusion::Space>([](auto self) {
+        fusion::scope<fusion::Timer>(self, [](auto self, auto space) {
+            fusion::scope<fusion::Timer>(self, [](auto self, auto space) {
+                auto entry_point = [=](auto entry_point) -> void {
+                    fusion::wait(self, space, [entry_point](auto self, auto space) {
+                        fusion::clear(self);
+                        entry_point(entry_point);
+                    });
+                };
+                fusion::build(self, std::chrono::system_clock::now(), std::chrono::seconds{1});
+                entry_point(entry_point);
+            });
         });
     });
 
