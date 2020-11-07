@@ -7,7 +7,7 @@
 
 namespace fusion {
 template <typename Point, typename Duration>
-void setup(int handler, const Point& point, const Duration& step) {
+void setup(const Handler& handler, const Point& point, const Duration& step) {
     struct itimerspec config;
     {
         auto duration = point.time_since_epoch();
@@ -25,7 +25,7 @@ void setup(int handler, const Point& point, const Duration& step) {
         config.it_interval.tv_sec  = time_t{seconds.count()};
         config.it_interval.tv_nsec = long{nanosecs.count()};
     }
-    if (timerfd_settime(handler, TFD_TIMER_ABSTIME, &config, NULL) < 0)
+    if (timerfd_settime(handler.native, TFD_TIMER_ABSTIME, &config, NULL) < 0)
         throw std::runtime_error(std::string("timerfd_settime: ") + strerror(errno));
 }
 
@@ -33,7 +33,7 @@ template <>
 Timer::Timer(
     const std::chrono::steady_clock::time_point& point,
     const std::chrono::milliseconds& duration)
-  : Element(timerfd_create(CLOCK_MONOTONIC, 0)) {
+  : Element{timerfd_create(CLOCK_MONOTONIC, 0)} {
     setup(handler, point, duration);
 }
 
@@ -41,20 +41,20 @@ template <>
 Timer::Timer(
     const std::chrono::system_clock::time_point& point,
     const std::chrono::milliseconds& duration)
-  : Element(timerfd_create(CLOCK_REALTIME, 0)) {
+  : Element{timerfd_create(CLOCK_REALTIME, 0)} {
     setup(handler, point, duration);
 }
 
 auto count(std::shared_ptr<Timer> self) -> size_t {
     std::uint64_t u = 0;
-    if (::read(self->handler, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+    if (::read(self->handler.native, &u, sizeof(uint64_t)) != sizeof(uint64_t))
         throw std::runtime_error(std::string("timer count: ") + strerror(errno));
     return std::size_t(u);
 }
 
 auto clear(std::shared_ptr<Timer> self) -> void {
     std::uint64_t u = 0;
-    if (::read(self->handler, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+    if (::read(self->handler.native, &u, sizeof(uint64_t)) != sizeof(uint64_t))
         throw std::runtime_error(std::string("timer clear: ") + strerror(errno));
 }
 } // namespace fusion

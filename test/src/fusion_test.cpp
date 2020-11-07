@@ -48,8 +48,8 @@
 // #include "fusion.hpp"
 // #include "resources/timer.hpp"
 
-#include <variant>
 #include <functional>
+#include <variant>
 
 #include <sys/eventfd.h>
 #include <unistd.h>
@@ -86,6 +86,10 @@
 
 
 TEST(FusionSpace, positive_test) {
+
+    // auto s = std::make_shared<fusion::Space>();
+    // auto p = std::make_shared<fusion::Scope<std::string, std::shared_ptr<fusion::Space>>>(s);
+    // fusion::wait(p, [](auto, auto){});
     //
     // std::make_shared<FusionSpace>()->main([](auto space){
     //     std::make_shared<TimeEvent>(space)->main([](auto timer) {
@@ -142,19 +146,50 @@ TEST(FusionSpace, positive_test) {
     //     });
     // });
 
-    fusion::space<fusion::Space>([](auto self) {
-        fusion::scope<fusion::Timer>(self, [](auto self, auto space) {
-            fusion::scope<fusion::Timer>(self, [](auto self, auto space) {
-                auto entry_point = [=](auto entry_point) -> void {
-                    fusion::wait(self, space, [entry_point](auto self, auto space) {
-                        fusion::clear(self);
-                        entry_point(entry_point);
-                    });
-                };
-                fusion::build(self, std::chrono::system_clock::now(), std::chrono::seconds{1});
-                entry_point(entry_point);
-            });
-        });
+    // fusion::build<fusion::Space>([](auto self) {
+    //     fusion::build<fusion::Timer>(
+    //         self,
+    //         [](auto self, auto space) {
+    //             fusion::build<fusion::Timer>(
+    //                 self,
+    //                 [](auto self, auto space) {
+    //                     auto entry_point = [=](auto entry_point) -> void {
+    //                         wait(self, [entry_point](auto self, auto space) {
+    //                             fusion::clear(self);
+    //                             entry_point(entry_point);
+    //                         });
+    //                     };
+    //                     entry_point(entry_point);
+    //                 },
+    //                 std::chrono::system_clock::now(),
+    //                 std::chrono::seconds{1});
+    //         },
+    //         std::chrono::system_clock::now(),
+    //         std::chrono::seconds{1});
+    // });
+
+    build<fusion::Space>([](auto self) {
+        std::cout << __func__ << ":" << __LINE__ <<std::endl;
+        build<fusion::Timer>(
+            self,
+            [](auto self, auto space) {
+                // auto entry_point = [self](auto entry_point) -> void {
+                //     fusion::wait(self, [entry_point](auto self, auto space) {
+                //         fusion::clear(self);
+                //         entry_point(entry_point);
+                //     });
+                // };
+                // entry_point(entry_point);
+                std::cout << __func__ << ":" << __LINE__ <<std::endl;
+                wait(self, [](auto self, auto space) {
+                    clear(self);
+                    // entry_point(entry_point);
+                });
+                std::cout << __func__ << ":" << __LINE__ <<std::endl;
+                clear(self);
+            },
+            std::chrono::system_clock::now(),
+            std::chrono::seconds{1});
     });
 
     // {

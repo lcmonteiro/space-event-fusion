@@ -2,8 +2,12 @@
 
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <type_traits>
+
+
+#include <iostream>
 
 namespace fusion {
 
@@ -13,117 +17,144 @@ struct Element;
 struct Cluster;
 struct Space;
 
-namespace {}
+namespace shared {
+    using Element = std::shared_ptr<Element>;
+    using Cluster = std::shared_ptr<Cluster>;
+    using Space   = std::shared_ptr<Space>;
+} // namespace shared
 
-using pElement = std::shared_ptr<Element>;
-using pCluster = std::shared_ptr<Cluster>;
-using pSpace   = std::shared_ptr<Space>;
+using Process = std::function<void()>;
 
-namespace {}
 
-using Task = std::function<void()>;
-
-/// Space
+/// ===============================================================================================
+/// Resources
 /// @brief
-/// @param func
-template <typename Space, typename Callable>
-void space(Callable func) {
-    func(std::make_shared<Space>());
-}
+///
+/// ===============================================================================================
+struct Handler {
+    // delete
+    Handler(Handler&&) = delete;
 
+    /// @brief
+    ///
+    template <typename Native>
+    Handler(Native id);
 
+    /// @brief
+    ///
+    ~Handler();
 
-/// wait functions
-/// @brief
-template <typename Resource, typename Base, typename Callable>
-std::enable_if_t<
-    std::conjunction_v<
-        std::is_convertible<Resource, pElement>,
-        std::is_invocable_r<void, Callable, Resource, Base>>,
-    void>
-wait(Resource resource, Base base, Callable func) {
-    wait(std::static_pointer_cast<Element>(resource), base, Task([=]() { func(resource, base); }));
-}
+    /// @brief
+    ///
+    const int native;
+};
 
-
-
-/// wait functions
-/// @brief
-// template <typename Base>
-// std::enable_if_t<std::conjunction_v<std::is_convertible<Base, pSpace>>, void>
-// wait(pElement resource, Base base, Task func) {
-//     wait(resource, std::static_pointer_cast<Space>(base), func);
-// }
-
-template <typename Resource, typename... Args>
-void build(Resource resource, Args&&... args) {}
-
-template <typename Resource, typename... Args>
-void clear(Resource resource, Args&&... args) {}
-
-
-/// Element
+/// Cluster
 /// @brief
 struct Element {
-    using Handler = int;
-
-    Element();
-    virtual ~Element();
-
-    Element(Element&&) = default;
-    Element& operator=(Element&&) = default;
-
   protected:
-    Element(Handler handler);
+    /// @brief
+    ///
+    template <typename Native>
+    Element(Native id) : handler{id} {}
 
+    /// @brief
+    ///
     const Handler handler;
 };
 
 /// Cluster
 /// @brief
-struct Cluster : Element {
-    friend void wait(pElement, pCluster, Task);
+struct Cluster {
+    using Shared = std::shared_ptr<Cluster>;
+    /// @brief
+    ///
+    const Handler handler;
+
+    /// wait
+    /// @brief
+    ///
+    friend void wait(const Handler& handler, Shared space, Process func);
 };
 
-/// Space object
+/// Space
 /// @brief
 struct Space {
-    friend void wait(pElement, pSpace, Task);
+    using Shared = std::shared_ptr<Space>;
+    /// Constructor
+    /// @brief
+    /// Space();
+
+    /// Destructor
+    /// @brief
+    /// virtual ~Space();
+protected:
+    /// wait
+    /// @brief
+    friend void wait(const Handler& handler, Shared space, Process func);
+private:
+    /// processes
+    /// @brief
+    std::map<int, Process> processes_;
 };
 
-namespace {
-    template <typename R, typename B>
-    struct Scope;
-    template <typename R, typename B>
-    using pScope = std::shared_ptr<Scope<R, B>>;
-
-    template <typename Resource, typename Base>
-    void wait(pElement resource, pScope<Resource, Base> base, Task func);
-    template <typename Resource, typename Base>
-    struct Scope : Resource {
-        Scope(Base base) : next(base) {}
-
-      protected:
-        friend void wait<>(pElement resource, pScope<Resource, Base> base, Task func);
-
-      private:
-        const Base next;
-    };
-
-    /// wait functions
-    /// @brief
-    template <typename Resource, typename Base>
-    void wait(pElement resource, pScope<Resource, Base> base, Task func) {
-        wait(resource, base->next, func);
-    }
-} // namespace
-
+/// ===============================================================================================
 /// Scope
 /// @brief
-template <typename Resource, typename Space, typename Callable>
-void scope(Space space, Callable func) {
-    try {
-        func(std::make_shared<Scope<Resource, Space>>(space), space);
-    } catch (...) {}
-}
+///
+/// ===============================================================================================
+namespace {
+    template <typename Source, typename Base>
+    struct scope : Source {
+        using Shared = std::shared_ptr<scope>;
+
+        /// constructor
+        /// @brief
+        template <typename... Args>
+        scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
+
+
+      protected:
+        template <typename Callable>
+        friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
+        wait(Shared scope, Callable func) {
+            wait(scope->handler, scope->base_, [func, scope, next = scope->base_]() {
+                func(scope, next);
+            });
+        }
+
+
+        template <typename Callable>
+        friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
+        wait(const Handler& handler, Shared scope, Callable func) {
+            wait(handler, scope->base_, func);
+        }
+
+
+
+        // friend class fusion::Waiter;
+        /// @brief
+        /// base element
+        const Base base_;
+    };
+    template <typename Source, typename Base>
+    using Scope = std::shared_ptr<scope<Source, Base>>;
+
+} // namespace
 } // namespace fusion
+
+/// ===============================================================================================
+/// Build - Interfaces
+/// @brief
+///
+/// ===============================================================================================
+template <typename Source, typename Callable, typename... Args>
+std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Space::Shared>, void>
+build(Callable call, Args&&... args) {
+    call(std::make_shared<Source>(std::forward<Args>(args)...));
+}
+template <typename Source, typename Base, typename Callable, typename... Args>
+std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>, void>
+build(Base base, Callable call, Args&&... args) {
+    call(std::make_shared<fusion::scope<Source, Base>>(base, std::forward<Args>(args)...), base);
+}
