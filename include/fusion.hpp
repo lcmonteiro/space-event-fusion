@@ -81,21 +81,15 @@ struct Cluster {
 /// @brief
 struct Space {
     using Shared = std::shared_ptr<Space>;
-    /// Constructor
-    /// @brief
-    /// Space();
-
-    /// Destructor
-    /// @brief
-    /// virtual ~Space();
-protected:
+  protected:
     /// wait
     /// @brief
     friend void wait(const Handler& handler, Shared space, Process func);
-private:
+
+  private:
     /// processes
     /// @brief
-    std::map<int, Process> processes_;
+    std::map<decltype(std::declval<const Handler>().native), Process> processes_;
 };
 
 /// ===============================================================================================
@@ -111,16 +105,20 @@ namespace {
         /// constructor
         /// @brief
         template <typename... Args>
-        scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
+        scope(Base base, Args&&... args)
+          : Source(std::forward<Args>(args)...), base_(base) {}
 
 
       protected:
         template <typename Callable>
-        friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
+        friend std::enable_if_t<
+            std::is_invocable_r_v<void, Callable, Shared, Base>,
+            void>
         wait(Shared scope, Callable func) {
-            wait(scope->handler, scope->base_, [func, scope, next = scope->base_]() {
-                func(scope, next);
-            });
+            wait(
+                scope->handler,
+                scope->base_,
+                [func, scope, next = scope->base_]() { func(scope, next); });
         }
 
 
@@ -154,7 +152,12 @@ build(Callable call, Args&&... args) {
     call(std::make_shared<Source>(std::forward<Args>(args)...));
 }
 template <typename Source, typename Base, typename Callable, typename... Args>
-std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>, void>
+std::enable_if_t<
+    std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>,
+    void>
 build(Base base, Callable call, Args&&... args) {
-    call(std::make_shared<fusion::scope<Source, Base>>(base, std::forward<Args>(args)...), base);
+    call(
+        std::make_shared<fusion::scope<Source, Base>>(
+            base, std::forward<Args>(args)...),
+        base);
 }

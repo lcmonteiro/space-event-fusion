@@ -66,7 +66,7 @@ BreakInheritanceList: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 PointerAlignment: Left
 ReflowComments: true
-ColumnLimit: 100
+ColumnLimit: 80
 
 # --- Other
 SortIncludes: true

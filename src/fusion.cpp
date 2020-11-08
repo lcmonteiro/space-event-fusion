@@ -1,14 +1,18 @@
 #include "fusion.hpp"
 
+#include <error.h>
 #include <string.h>
+#include <sys/poll.h>
 #include <unistd.h>
+
+#include <system_error>
 
 namespace fusion {
 
 /// Handler
 /// @brief
 ///
-template<>
+template <>
 Handler::Handler(int h) : native{h} {
     if (native < 0)
         throw std::runtime_error(std::string("resource: ") + strerror(errno));
@@ -21,35 +25,45 @@ Handler::~Handler() {
 /// Space
 /// @brief
 ///
-
-
-/// Space
-/// @brief
-///
 void wait(const Handler& handler, Space::Shared space, Process func) {
     // update process list
-    //space->processes_[handler] = func;
+    space->processes_[handler.native] = func;
 
+    // transform
+    std::vector<pollfd> fds;
+    std::transform(
+        space->processes_.begin(),
+        space->processes_.end(),
+        std::back_inserter(fds),
+        [](auto& v) {
+            return pollfd{
+                .fd      = std::get<0>(v),
+                .events  = POLLIN | POLLERR | POLLRDHUP,
+                .revents = 0};
+        });
 
-    // int r = 0;
-    // if ((r = ::poll(handlers_.data(), handlers_.size(), -1) < 0) {
-    //     throw std::runtime_error(make_error_code(errc(errno)));
-    // }
-    // /**
-    //  * check
-    //  */
-    // list<size_t> res;
-    // for (size_t i = 0, n = r; (i < __locations.size()) && (res.size() < n); ++i) {
-    //     if (__locations[i].revents & __locations[i].events) {
-    //         res.emplace_back(i);
-    //     }
-    //     /**
-    //      * clear event
-    //      */
-    //     __locations[i].revents = 0;
-    // }
-    // return res;
-    std::cout << __func__ << "" << __LINE__ << std::endl;
+    // wait for events
+    auto count = ::poll(fds.data(), fds.size(), -1);
+
+    // check error
+    if (count < 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+
+    // process events
+    for (auto& fd : fds) {
+        if (fd.revents) {
+            if (POLLIN == fd.revents) {
+                try {
+                    space->processes_[fd.fd]();
+                } catch (const std::exception& e) {
+                    std::cerr << e.what() << std::endl;
+                }
+            }
+            if (--count == 0) {
+                return;
+            }
+        }
+    }
 }
 
 /// Cluster

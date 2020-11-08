@@ -68,5 +68,8 @@
         "cfenv": "cpp",
         "typeindex": "cpp",
         "*.ipp": "cpp"
-    }
+    },
+    "cSpell.words": [
+        "POLLRDHUP"
+    ]
 }
