@@ -10,7 +10,7 @@ IndentCaseLabels: false
 IndentWidth: 4
 IndentWrappedFunctionNames: false
 ConstructorInitializerIndentWidth: 2
-ContinuationIndentWidth: 4
+ContinuationIndentWidth: 2
 AccessModifierOffset: -2 # how far e.g public is indented
 NamespaceIndentation: Inner
 
@@ -23,7 +23,7 @@ BraceWrapping:
     AfterNamespace : false
     AfterStruct : false
     AfterUnion : false
-    BeforeCatch : false
+    BeforeCatch : true
     BeforeElse : false
     IndentBraces : false
     AfterControlStatement: false
@@ -66,7 +66,7 @@ BreakInheritanceList: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 PointerAlignment: Left
 ReflowComments: true
-ColumnLimit: 80
+ColumnLimit: 100
 
 # --- Other
 SortIncludes: true

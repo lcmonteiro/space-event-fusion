@@ -70,6 +70,7 @@
         "*.ipp": "cpp"
     },
     "cSpell.words": [
+        "EPOLLIN",
         "POLLRDHUP"
     ]
 }

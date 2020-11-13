@@ -26,6 +26,17 @@ namespace shared {
 using Process = std::function<void()>;
 
 
+template <int n>
+struct type {
+    constexpr static int id = n;
+    explicit type()         = default;
+};
+
+using Output = type<0>;
+using Input  = type<1>;
+using Error  = type<3>;
+
+
 /// ===============================================================================================
 /// Resources
 /// @brief
@@ -81,15 +92,31 @@ struct Cluster {
 /// @brief
 struct Space {
     using Shared = std::shared_ptr<Space>;
+
+    /// constructor
+    /// @brief
+    Space();
+
+    /// run
+    /// @brief
+    void run();
+
   protected:
     /// wait
     /// @brief
-    friend void wait(const Handler& handler, Shared space, Process func);
+    friend void wait(Input, const Handler& handler, Shared space, Process func);
+    friend void wait(Error, const Handler& handler, Shared space, Process func);
 
   private:
-    /// processes
     /// @brief
-    std::map<decltype(std::declval<const Handler>().native), Process> processes_;
+    ///
+    const Handler handler;
+
+    // /// processes
+    // /// @brief
+    // std::vector<std::tuple<const Handler&, int, Process>> catch_;
+
+    std::unordered_map<int, std::tuple<int, std::map<int, Process>>> cache_;
 };
 
 /// ===============================================================================================
@@ -105,27 +132,41 @@ namespace {
         /// constructor
         /// @brief
         template <typename... Args>
-        scope(Base base, Args&&... args)
-          : Source(std::forward<Args>(args)...), base_(base) {}
+        scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
 
 
       protected:
-        template <typename Callable>
-        friend std::enable_if_t<
-            std::is_invocable_r_v<void, Callable, Shared, Base>,
-            void>
+        /// wait
+        /// @brief
+        // template <typename Callable>
+        // friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
+        // wait(Shared scope, Callable func) {
+        //     wait(scope->handler, scope->base_, [func, scope, next = scope->base_]() {
+        //         func(scope, next);
+        //     });
+        // }
+
+        /// wait
+        /// @brief
+        template <typename Type, typename Callable>
+        friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
         wait(Shared scope, Callable func) {
-            wait(
-                scope->handler,
-                scope->base_,
-                [func, scope, next = scope->base_]() { func(scope, next); });
+            wait(Type(), scope->handler, scope->base_, [func, scope, next = scope->base_]() {
+                func(scope, next);
+            });
         }
 
 
-        template <typename Callable>
+        // template <typename Callable>
+        // friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
+        // wait(const Handler& handler, Shared scope, Callable func) {
+        //     wait(handler, scope->base_, func);
+        // }
+
+        template <typename Type, typename Callable>
         friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
-        wait(const Handler& handler, Shared scope, Callable func) {
-            wait(handler, scope->base_, func);
+        wait(Type, const Handler& handler, Shared scope, Callable func) {
+            wait(Type(), handler, scope->base_, func);
         }
 
 
@@ -134,6 +175,10 @@ namespace {
         /// @brief
         /// base element
         const Base base_;
+    };
+    template <typename Source>
+    struct scope<Source, void> : Source {
+        using Shared = std::shared_ptr<scope>;
     };
     template <typename Source, typename Base>
     using Scope = std::shared_ptr<scope<Source, Base>>;
@@ -147,17 +192,18 @@ namespace {
 ///
 /// ===============================================================================================
 template <typename Source, typename Callable, typename... Args>
-std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Space::Shared>, void>
+std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, void>>, void>
 build(Callable call, Args&&... args) {
-    call(std::make_shared<Source>(std::forward<Args>(args)...));
+    auto source = std::make_shared<Source>(std::forward<Args>(args)...);
+    call(source);
+    source->run();
 }
 template <typename Source, typename Base, typename Callable, typename... Args>
-std::enable_if_t<
-    std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>,
-    void>
+std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>, void>
 build(Base base, Callable call, Args&&... args) {
-    call(
-        std::make_shared<fusion::scope<Source, Base>>(
-            base, std::forward<Args>(args)...),
-        base);
+    call(std::make_shared<fusion::scope<Source, Base>>(base, std::forward<Args>(args)...), base);
 }
+
+template <typename Type, typename Source, typename Base, typename Callable>
+std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>, void>
+wait(fusion::Scope<Source, Base> scope, Callable func);
