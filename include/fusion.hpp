@@ -11,30 +11,25 @@
 
 namespace fusion {
 
-/// Fusion Elements
+/// ===============================================================================================
+/// Types
 /// @brief
-struct Element;
-struct Cluster;
-struct Space;
-
-namespace shared {
-    using Element = std::shared_ptr<Element>;
-    using Cluster = std::shared_ptr<Cluster>;
-    using Space   = std::shared_ptr<Space>;
-} // namespace shared
-
-using Process = std::function<void()>;
-
-
+///
+/// ===============================================================================================
+/// waiting types
+/// @brief
 template <int n>
 struct type {
     constexpr static int id = n;
     explicit type()         = default;
 };
-
 using Output = type<0>;
 using Input  = type<1>;
 using Error  = type<3>;
+
+/// process
+/// @brief
+using Process = std::function<void()>;
 
 
 /// ===============================================================================================
@@ -112,10 +107,8 @@ struct Space {
     ///
     const Handler handler;
 
-    // /// processes
-    // /// @brief
-    // std::vector<std::tuple<const Handler&, int, Process>> catch_;
-
+    /// cache
+    /// @brief
     std::unordered_map<int, std::tuple<int, std::map<int, Process>>> cache_;
 };
 
@@ -134,18 +127,7 @@ namespace {
         template <typename... Args>
         scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
 
-
       protected:
-        /// wait
-        /// @brief
-        // template <typename Callable>
-        // friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
-        // wait(Shared scope, Callable func) {
-        //     wait(scope->handler, scope->base_, [func, scope, next = scope->base_]() {
-        //         func(scope, next);
-        //     });
-        // }
-
         /// wait
         /// @brief
         template <typename Type, typename Callable>
@@ -155,23 +137,13 @@ namespace {
                 func(scope, next);
             });
         }
-
-
-        // template <typename Callable>
-        // friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
-        // wait(const Handler& handler, Shared scope, Callable func) {
-        //     wait(handler, scope->base_, func);
-        // }
-
         template <typename Type, typename Callable>
         friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
         wait(Type, const Handler& handler, Shared scope, Callable func) {
             wait(Type(), handler, scope->base_, func);
         }
 
-
-
-        // friend class fusion::Waiter;
+      private:
         /// @brief
         /// base element
         const Base base_;
