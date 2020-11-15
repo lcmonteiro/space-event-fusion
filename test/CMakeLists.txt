@@ -36,5 +36,6 @@ add_gtests(event-fusion-test
 TARGET 
 	event-fusion 
 TEST_SOURCES 
-	./src/fusion_test.cpp
+	./fusion_test.cpp
+	./resources/stream/remote_test.cpp
 )

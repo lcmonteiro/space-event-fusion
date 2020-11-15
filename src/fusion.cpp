@@ -75,7 +75,7 @@ void Space::run() {
 /// Space
 /// @brief
 ///
-void wait(Input, const Handler& handler, Space::Shared space, Process func) {
+void wait(Input, const Handler& handler, const Space::Shared& space, Process func) {
     auto& [events, procs] = space->cache_[handler.native];
     // update event
     epoll_event ev;
@@ -87,7 +87,7 @@ void wait(Input, const Handler& handler, Space::Shared space, Process func) {
     procs[Input::id] = func;
     events           = ev.events;
 }
-void wait(Error, const Handler& handler, Space::Shared space, Process func) {
+void wait(Error, const Handler& handler, const Space::Shared& space, Process func) {
     auto& [events, procs] = space->cache_[handler.native];
     // update event
     epoll_event ev;

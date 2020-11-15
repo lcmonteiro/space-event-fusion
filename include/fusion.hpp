@@ -27,6 +27,9 @@ using Output = type<0>;
 using Input  = type<1>;
 using Error  = type<3>;
 
+/// extended wainting types
+struct Connection : Input {};
+
 /// process
 /// @brief
 using Process = std::function<void()>;
@@ -38,8 +41,9 @@ using Process = std::function<void()>;
 ///
 /// ===============================================================================================
 struct Handler {
-    // delete
+    // deleted
     Handler(Handler&&) = delete;
+    Handler(Handler&)  = delete;
 
     /// @brief
     ///
@@ -64,8 +68,16 @@ struct Element {
     template <typename Native>
     Element(Native id) : handler{id} {}
 
+    /// wait
     /// @brief
-    ///
+    template <typename Type>
+    friend Process wait(Type, Element& elem, Process proc) {
+        std::cout << __FILE__ << __LINE__ << std::endl;
+        return proc;
+    }
+
+    /// handler
+    /// @brief
     const Handler handler;
 };
 
@@ -80,7 +92,15 @@ struct Cluster {
     /// wait
     /// @brief
     ///
-    friend void wait(const Handler& handler, Shared space, Process func);
+    template <typename Type>
+    friend Process wait(Type, Cluster& cluster, Process proc) {
+        return proc;
+    }
+
+    /// wait
+    /// @brief
+    ///
+    friend void wait(const Handler& handler, Shared& space, Process func);
 };
 
 /// Space
@@ -99,8 +119,8 @@ struct Space {
   protected:
     /// wait
     /// @brief
-    friend void wait(Input, const Handler& handler, Shared space, Process func);
-    friend void wait(Error, const Handler& handler, Shared space, Process func);
+    friend void wait(Input, const Handler& handler, const Shared& space, Process func);
+    friend void wait(Error, const Handler& handler, const Shared& space, Process func);
 
   private:
     /// @brief
@@ -130,17 +150,24 @@ namespace {
       protected:
         /// wait
         /// @brief
-        template <typename Type, typename Callable>
-        friend std::enable_if_t<std::is_invocable_r_v<void, Callable, Shared, Base>, void>
-        wait(Shared scope, Callable func) {
-            wait(Type(), scope->handler, scope->base_, [func, scope, next = scope->base_]() {
-                func(scope, next);
-            });
+        template <typename Type, typename... Args>
+        friend void wait(Shared scope, std::function<void(Shared, Base)> func, Args&&... args) {
+            wait(
+              Type(),
+              scope->handler,
+              scope->base_,
+              wait(
+                Type(),
+                *scope,
+                [call = std::move(func), scope, next = scope->base_]() { call(scope, next); },
+                std::forward<Args>(args)...));
         }
-        template <typename Type, typename Callable>
-        friend std::enable_if_t<std::is_invocable_r_v<void, Callable>, void>
-        wait(Type, const Handler& handler, Shared scope, Callable func) {
-            wait(Type(), handler, scope->base_, func);
+
+        /// wait
+        /// @brief
+        template <typename Type>
+        friend void wait(Type, const Handler& handler, const Shared& scope, Process func) {
+            wait(Type(), handler, scope->base_, std::move(func));
         }
 
       private:
@@ -176,6 +203,15 @@ build(Base base, Callable call, Args&&... args) {
     call(std::make_shared<fusion::scope<Source, Base>>(base, std::forward<Args>(args)...), base);
 }
 
-template <typename Type, typename Source, typename Base, typename Callable>
-std::enable_if_t<std::is_invocable_r_v<void, Callable, fusion::Scope<Source, Base>, Base>, void>
-wait(fusion::Scope<Source, Base> scope, Callable func);
+/// ===============================================================================================
+/// Wait - Interfaces
+/// @brief
+///
+/// ===============================================================================================
+template <
+  typename Type,
+  typename Source,
+  typename Base,
+  typename Shared = fusion::Scope<Source, Base>,
+  typename... Args>
+void wait(Shared, std::function<void(Shared, Base)>, Args&&...);

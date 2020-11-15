@@ -9,7 +9,7 @@ namespace fusion {} // namespace fusion
 
 /// Test
 /// @brief
-TEST(FusionSpace, positive_test) {
+TEST(fusion_space, positive_test) {
     build<fusion::Space>([](auto self) {
         build<fusion::Timer>(
           self,
