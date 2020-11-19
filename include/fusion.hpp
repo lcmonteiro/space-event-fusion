@@ -78,7 +78,7 @@ struct Handler {
   private:
     /// @brief
     ///
-    int native_;
+    int native_{-1};
 };
 
 /// Cluster
