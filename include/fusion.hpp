@@ -10,7 +10,6 @@
 #include <iostream>
 
 namespace fusion {
-
 /// ===============================================================================================
 /// Types
 /// @brief
@@ -23,12 +22,20 @@ struct type {
     constexpr static int id = n;
     explicit type()         = default;
 };
-using Output = type<0>;
-using Input  = type<1>;
+using Output = type<1>;
+using Input  = type<2>;
 using Error  = type<3>;
 
 /// extended wainting types
-struct Connection : Input {};
+/// - Connection
+template <typename Type>
+struct Connection : Type {};
+namespace output {
+    using Connection = fusion::Connection<Output>;
+}
+namespace input {
+    using Connection = fusion::Connection<Input>;
+}
 
 /// process
 /// @brief
@@ -42,21 +49,36 @@ using Process = std::function<void()>;
 /// ===============================================================================================
 struct Handler {
     // deleted
-    Handler(Handler&&) = delete;
-    Handler(Handler&)  = delete;
+    Handler(const Handler&) = delete;
 
+    /// constructor
     /// @brief
-    ///
     template <typename Native>
     Handler(Native id);
 
+    /// move constructor
     /// @brief
-    ///
+    Handler(Handler&& h) { std::swap(native_, h.native_); }
+
+    /// move assign
+    /// @brief
+    Handler& operator=(Handler&& h) {
+        std::swap(native_, h.native_);
+        return *this;
+    }
+
+    /// native
+    /// @brief
+    auto native() const { return native_; }
+
+    /// destructor
+    /// @brief
     ~Handler();
 
+  private:
     /// @brief
     ///
-    const int native;
+    int native_;
 };
 
 /// Cluster
@@ -65,33 +87,28 @@ struct Element {
   protected:
     /// @brief
     ///
-    template <typename Native>
-    Element(Native id) : handler{id} {}
+    Element(Handler&& id) : handler{std::move(id)} {}
 
     /// wait
     /// @brief
     template <typename Type>
     friend Process wait(Type, Element& elem, Process proc) {
-        std::cout << __FILE__ << __LINE__ << std::endl;
         return proc;
     }
 
+  protected:
     /// handler
     /// @brief
-    const Handler handler;
+    Handler handler;
 };
 
 /// Cluster
 /// @brief
 struct Cluster {
     using Shared = std::shared_ptr<Cluster>;
-    /// @brief
-    ///
-    const Handler handler;
 
     /// wait
     /// @brief
-    ///
     template <typename Type>
     friend Process wait(Type, Cluster& cluster, Process proc) {
         return proc;
@@ -101,6 +118,11 @@ struct Cluster {
     /// @brief
     ///
     friend void wait(const Handler& handler, Shared& space, Process func);
+
+  protected:
+    /// @brief
+    ///
+    Handler handler;
 };
 
 /// Space
@@ -120,12 +142,13 @@ struct Space {
     /// wait
     /// @brief
     friend void wait(Input, const Handler& handler, const Shared& space, Process func);
+    friend void wait(Output, const Handler& handler, const Shared& space, Process func);
     friend void wait(Error, const Handler& handler, const Shared& space, Process func);
 
   private:
     /// @brief
     ///
-    const Handler handler;
+    Handler handler;
 
     /// cache
     /// @brief
@@ -159,7 +182,7 @@ namespace {
               wait(
                 Type(),
                 *scope,
-                [call = std::move(func), scope, next = scope->base_]() { call(scope, next); },
+                [call = std::move(func), scope, next = scope->base_] { call(scope, next); },
                 std::forward<Args>(args)...));
         }
 
@@ -215,3 +238,13 @@ template <
   typename Shared = fusion::Scope<Source, Base>,
   typename... Args>
 void wait(Shared, std::function<void(Shared, Base)>, Args&&...);
+
+/// ===============================================================================================
+/// Helpers
+/// @brief
+///
+/// ===============================================================================================
+template <typename Space, typename Process>
+void function(Space space, Process func) {
+    func(space, func);
+}
