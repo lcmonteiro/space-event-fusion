@@ -25,7 +25,6 @@ void setup(const Handler& handler, const Point& point, const Duration& step) {
         config.it_interval.tv_sec  = time_t{seconds.count()};
         config.it_interval.tv_nsec = long{nanosecs.count()};
     }
-    std::cout << "timer fd= " << handler.native() << std::endl;
     if (timerfd_settime(handler.native(), TFD_TIMER_ABSTIME, &config, NULL) < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)), "timerfd_settime");
 }
@@ -49,13 +48,13 @@ Timer::Timer(
 auto count(std::shared_ptr<Timer> self) -> size_t {
     std::uint64_t u = 0;
     if (::read(self->handler.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
-        throw std::runtime_error(std::string("timer count: ") + strerror(errno));
+        throw std::system_error(std::make_error_code(std::errc(errno)), "timer::count:");
     return std::size_t(u);
 }
 
 auto clear(std::shared_ptr<Timer> self) -> void {
     std::uint64_t u = 0;
     if (::read(self->handler.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
-        throw std::runtime_error(std::string("timer clear: ") + strerror(errno));
+        throw std::system_error(std::make_error_code(std::errc(errno)), "timer::clear:");
 }
 } // namespace fusion

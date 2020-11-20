@@ -5,9 +5,7 @@
 #include <map>
 #include <memory>
 #include <type_traits>
-
-
-#include <iostream>
+#include <variant>
 
 namespace fusion {
 /// ===============================================================================================
@@ -15,16 +13,16 @@ namespace fusion {
 /// @brief
 ///
 /// ===============================================================================================
-/// waiting types
+/// waiting base types
 /// @brief
 template <int n>
-struct type {
+struct basetype {
     constexpr static int id = n;
-    explicit type()         = default;
+    explicit basetype()     = default;
 };
-using Output = type<1>;
-using Input  = type<2>;
-using Error  = type<3>;
+using Output = basetype<1>;
+using Input  = basetype<2>;
+using Error  = basetype<3>;
 
 /// extended wainting types
 /// - Connection
@@ -89,12 +87,6 @@ struct Element {
     ///
     Element(Handler&& id) : handler{std::move(id)} {}
 
-    /// wait
-    /// @brief
-    template <typename Type>
-    friend Process wait(Type, Element& elem, Process proc) {
-        return proc;
-    }
 
   protected:
     /// handler
@@ -106,13 +98,6 @@ struct Element {
 /// @brief
 struct Cluster {
     using Shared = std::shared_ptr<Cluster>;
-
-    /// wait
-    /// @brief
-    template <typename Type>
-    friend Process wait(Type, Cluster& cluster, Process proc) {
-        return proc;
-    }
 
     /// wait
     /// @brief
@@ -171,10 +156,13 @@ namespace {
         scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
 
       protected:
+        using Callable = std::function<void(Shared, Base)>;
+        
         /// wait
         /// @brief
         template <typename Type, typename... Args>
-        friend void wait(Shared scope, std::function<void(Shared, Base)> func, Args&&... args) {
+        friend void wait(Type, const Shared& scope, Callable func, Args&&... args) {
+            std::cout << __LINE__ << std::endl;
             wait(
               Type(),
               scope->handler,
@@ -184,6 +172,15 @@ namespace {
                 *scope,
                 [call = std::move(func), scope, next = scope->base_] { call(scope, next); },
                 std::forward<Args>(args)...));
+        }
+        template <int n, typename... Args>
+        friend void wait(basetype<n>, const Shared& scope, Callable func, Args&&... args) {
+            std::cout << __LINE__ << std::endl;
+            wait(
+              basetype<n>(),
+              scope->handler,
+              scope->base_,
+              [call = std::move(func), scope, next = scope->base_] { call(scope, next); });
         }
 
         /// wait
@@ -231,13 +228,14 @@ build(Base base, Callable call, Args&&... args) {
 /// @brief
 ///
 /// ===============================================================================================
-template <
-  typename Type,
-  typename Source,
-  typename Base,
-  typename Shared = fusion::Scope<Source, Base>,
-  typename... Args>
-void wait(Shared, std::function<void(Shared, Base)>, Args&&...);
+template <typename Type, typename Shared, typename Callable, typename... Args>
+void wait(Shared&& scope, Callable&& callable, Args&&... args) {
+    wait(
+      Type(),
+      std::forward<Shared>(scope),
+      std::forward<Callable>(callable),
+      std::forward<Args>(args)...);
+}
 
 /// ===============================================================================================
 /// Helpers

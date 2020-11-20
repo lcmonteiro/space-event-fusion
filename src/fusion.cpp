@@ -11,20 +11,6 @@
 
 namespace fusion {
 
-template <typename T>
-void print_cache(T& cache) {
-    for (auto& [fd, data] : cache) {
-        std::cout << "fd= " << fd << std::endl;
-        auto& [ev, procs] = data;
-        std::cout << "ev= " << ev << std::endl;
-        for (auto& [id, pr] : procs) {
-            std::cout << "- id= " << id << std::endl;
-            std::cout << "- pr= " << &pr << std::endl;
-        }
-    }
-    std::cout << std::endl;
-}
-
 /// Handler
 /// @brief
 ///
@@ -49,7 +35,9 @@ Space::Space() : handler{::epoll_create1(0)} {}
 ///
 void Space::run() {
     std::vector<epoll_event> events(10);
-    for (;;) {
+
+    // run until empty cache 
+    while (!cache_.empty()) {
         // wait for events
         auto count = ::epoll_wait(handler.native(), events.data(), events.size(), -1);
 
@@ -76,18 +64,13 @@ void Space::run() {
                         node.mapped()();
                     }
                     catch (const std::exception& e) {
-                        std::cerr << e.what() << std::endl;
+                        std::cerr << "space::run:" << e.what() << std::endl;
                     }
                 }
             }
-            // check resources process
-            if (proc.empty()) {
-                if (::epoll_ctl(handler.native(), EPOLL_CTL_DEL, ev.data.fd, NULL) < 0)
-                    std::cerr << ev.data.fd << std::endl;
-
-                // throw std::system_error(std::make_error_code(std::errc(errno)));
+            // check & update cache
+            if (proc.empty())
                 cache_.erase(ev.data.fd);
-            }
         }
         events.resize(events.capacity());
     }
@@ -138,31 +121,6 @@ void wait(Error, const Handler& handler, const Space::Shared& space, Process fun
     procs[Error::id] = func;
     events           = ev.events;
 }
-
-// void wait(
-//   std::variant<Input, Output, Error> variant,
-//   const Handler& handler,
-//   const Space::Shared& space,
-//   Process func) {
-
-//     std::visit(
-//       [&](auto v) {
-//           auto& [events, procs] = space->cache_[handler.native()];
-//           // update event
-//           epoll_event ev;
-//           ev.events  = events | EPOLLERR | EPOLLHUP | EPOLLONESHOT;
-//           ev.data.fd = handler.native();
-//           assert(
-//             ::epoll_ctl(
-//               space->handler.native(), events ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, handler.native(), &ev)
-//             == 0);
-
-//           // update cache
-//           procs[v.id] = func;
-//           events      = ev.events;
-//       },
-//       variant)
-// }
 
 /// Cluster
 /// @brief
