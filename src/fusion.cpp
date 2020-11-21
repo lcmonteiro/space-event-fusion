@@ -1,5 +1,10 @@
+/// ===============================================================================================
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @file fusion.cpp                                                    _| |  | (_-<  |   _ \    \ 
+/// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
+/// @date November 20, 2020        
+/// ===============================================================================================
 #include "fusion.hpp"
-
 
 #include <error.h>
 #include <string.h>
@@ -128,7 +133,4 @@ void wait(Error, const Handler& handler, const Space::Shared& space, Process fun
 void wait(const Handler& handler, Cluster::Shared space, Process func) {
     std::cout << __func__ << "" << __LINE__ << std::endl;
 }
-
-
-
 } // namespace fusion

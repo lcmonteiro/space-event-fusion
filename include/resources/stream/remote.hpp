@@ -1,6 +1,13 @@
+/// ===============================================================================================
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @file remote.hpp                                                    _| |  | (_-<  |   _ \    \ 
+/// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
+/// @date November 20, 2020        
+/// ===============================================================================================
 #pragma once
 
-#include <chrono>
+#include <tuple>
+#include <string>
 
 #include "fusion.hpp"
 
@@ -48,8 +55,8 @@ namespace stream {
           public:
             using Shared = std::shared_ptr<Client>;
             /// constructor
-            /// @brief create and bind a local address
-            /// @param local address
+            /// @brief create 
+            /// @param domain IPv4 or IPv6
             template <typename Domain>
             Client(Domain);
 
@@ -70,3 +77,5 @@ namespace stream {
     } // namespace remote
 } // namespace stream
 } // namespace fusion
+/// ===============================================================================================
+/// ===============================================================================================
