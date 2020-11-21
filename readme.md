@@ -6,7 +6,7 @@ Use Event Fusion, select your resources, give them a workspace and wait :sweat_s
 ![fusion](doc/event-fusion.svg)
 
 # Use Case
-TCP client and server resources interacting wit each other
+TCP client and server resources interacting with each other
 
 ``` C++
 build<fusion::Space>([](auto self) {
