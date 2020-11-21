@@ -1,5 +1,6 @@
 # Space Event Fusion
 Do we really need SW managers? :thinking:
+
 Use Event Fusion, select resources, give them a workspace and wait :sweat_smile:
 
 ![fusion](doc/event-fusion.svg)
