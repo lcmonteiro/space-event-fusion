@@ -14,6 +14,7 @@ namespace fusion {
 class Timer : public Element {
   public:
     using Shared = std::shared_ptr<Timer>;
+    
     /// constructor
     /// @param point time
     /// @param step time period
@@ -25,9 +26,9 @@ class Timer : public Element {
   protected:
     /// count
     /// @return number of expired times
-    friend auto count(Shared) -> size_t;
+    friend size_t count(Shared);
 
     /// clear events
-    friend auto clear(Shared) -> void;
+    friend void clear(Shared);
 };
 } // namespace fusion

@@ -1,8 +1,8 @@
 /// ===============================================================================================
-/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)
 /// @file fusion.cpp                                                    _| |  | (_-<  |   _ \    \ 
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
-/// @date November 20, 2020        
+/// @date November 20, 2020
 /// ===============================================================================================
 #include "fusion.hpp"
 
@@ -16,9 +16,12 @@
 
 namespace fusion {
 
-/// Handler
-/// @brief
-///
+/// ===============================================================================================
+/// Handler implementation
+/// - constructor
+/// - desctructor
+/// ===============================================================================================
+
 template <>
 Handler::Handler(int h) : native_{h} {
     if (native_ < 0)
@@ -30,21 +33,25 @@ Handler::~Handler() {
         close(native_);
 }
 
+
+/// ===============================================================================================
+/// Space implementation
+/// - run
+/// - wait
+/// ===============================================================================================
 /// constructor
 /// @brief
-///
-Space::Space() : handler{::epoll_create1(0)} {}
+Space::Space() : handler_{::epoll_create1(0)} {}
 
 /// run
 /// @brief
-///
 void Space::run() {
     std::vector<epoll_event> events(10);
 
-    // run until empty cache 
+    // run until empty cache
     while (!cache_.empty()) {
         // wait for events
-        auto count = ::epoll_wait(handler.native(), events.data(), events.size(), -1);
+        auto count = ::epoll_wait(handler_.native(), events.data(), events.size(), -1);
 
         // check error
         if (count < 0)
@@ -58,15 +65,25 @@ void Space::run() {
         events.resize(count);
         for (auto& ev : events) {
             // find resource cached processes
-            auto& [events, proc] = cache_[ev.data.fd];
+            auto& [events, procs] = cache_[ev.data.fd];
 
             // process resource events
             for (auto& [id, mask] : EVENT_MAP) {
                 if (ev.events & mask) {
                     events &= ~mask;
+                    auto node = procs.extract(id);
                     try {
-                        auto node = proc.extract(id);
                         node.mapped()();
+                    }
+                    catch (const exception::Continue&) {
+                        // reinsert
+                        events |= mask;
+                        procs.insert(std::move(node));
+                        // update
+                        epoll_event e;
+                        e.events  = events;
+                        e.data.fd = ev.data.fd;
+                        assert(::epoll_ctl(handler_.native(), EPOLL_CTL_MOD, e.data.fd, &e) == 0);
                     }
                     catch (const std::exception& e) {
                         std::cerr << "space::run:" << e.what() << std::endl;
@@ -74,60 +91,44 @@ void Space::run() {
                 }
             }
             // check & update cache
-            if (proc.empty())
+            if (procs.empty())
                 cache_.erase(ev.data.fd);
         }
         events.resize(events.capacity());
     }
 }
 
-/// Space
+/// Wait
 /// @brief
-///
-void wait(Input, const Handler& handler, const Space::Shared& space, Process func) {
-    auto& [events, procs] = space->cache_[handler.native()];
+template <int id, int flags, typename Cache, typename Process>
+void wait(const Handler& base, Cache& cache, const Handler& source, Process& proc) {
+    auto& [events, procs] = cache[source.native()];
     // update event
     epoll_event ev;
-    ev.events  = events | EPOLLIN | EPOLLONESHOT;
-    ev.data.fd = handler.native();
+    ev.events  = events | flags | EPOLLONESHOT;
+    ev.data.fd = source.native();
     assert(
-      ::epoll_ctl(
-        space->handler.native(), events ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, handler.native(), &ev)
+      ::epoll_ctl(base.native(), events ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, source.native(), &ev)
       == 0);
     // update cache
-    procs[Input::id] = func;
-    events           = ev.events;
+    procs[id] = proc;
+    events    = ev.events;
+}
+void wait(Input, const Handler& handler, const Space::Shared& space, Process func) {
+    wait<Input::id, EPOLLIN>(space->handler_, space->cache_, handler, func);
 }
 void wait(Output, const Handler& handler, const Space::Shared& space, Process func) {
-    auto& [events, procs] = space->cache_[handler.native()];
-    // update event
-    epoll_event ev;
-    ev.events  = events | EPOLLOUT | EPOLLONESHOT;
-    ev.data.fd = handler.native();
-    assert(
-      ::epoll_ctl(
-        space->handler.native(), events ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, handler.native(), &ev)
-      == 0);
-    // update cache
-    procs[Output::id] = func;
-    events            = ev.events;
+    wait<Output::id, EPOLLOUT>(space->handler_, space->cache_, handler, func);
 }
 void wait(Error, const Handler& handler, const Space::Shared& space, Process func) {
-    auto& [events, procs] = space->cache_[handler.native()];
-    // update event
-    epoll_event ev;
-    ev.events  = events | EPOLLERR | EPOLLHUP | EPOLLONESHOT;
-    ev.data.fd = handler.native();
-    assert(
-      ::epoll_ctl(
-        space->handler.native(), events ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, handler.native(), &ev)
-      == 0);
-    // update cache
-    procs[Error::id] = func;
-    events           = ev.events;
+    wait<Error::id, EPOLLERR>(space->handler_, space->cache_, handler, func);
 }
 
-/// Cluster
+/// ===============================================================================================
+/// Cluster implementation
+/// - wait
+/// ===============================================================================================
+/// 
 /// @brief
 ///
 void wait(const Handler& handler, Cluster::Shared space, Process func) {

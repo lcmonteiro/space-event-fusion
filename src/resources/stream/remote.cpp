@@ -1,8 +1,8 @@
 /// ===============================================================================================
-/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)
 /// @file remote.cpp                                                    _| |  | (_-<  |   _ \    \ 
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
-/// @date November 20, 2020        
+/// @date November 20, 2020
 /// ===============================================================================================
 #include "resources/stream/remote.hpp"
 
@@ -72,26 +72,25 @@ namespace stream {
             }()) {}
 
 
-        Process wait(input::Connection, Server& self, Process proc) {
+        Process wait(input::Connection, Server& self, Server::Callback callback) {
             // after input waitting
-            return [&self, process = std::move(proc)] {
+            return [&self, callback = std::move(callback)] {
                 // accept & update handler
-                self.handler = Handler(::accept(self.handler.native(), NULL, NULL));
-                // call the register process
-                process();
+                self.handler_ = Handler(::accept(self.handler_.native(), NULL, NULL));
+                // back to main function
+                callback();
             };
         }
 
-
         void read(Server::Shared self, std::string& str) {
-            auto count = ::recv(self->handler.native(), str.data(), str.size(), 0);
+            auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
             if (count <= 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)));
             str.resize(count);
         }
 
         void write(Server::Shared self, const std::string& str) {
-            if (::send(self->handler.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
+            if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)));
         }
 
@@ -99,12 +98,8 @@ namespace stream {
         /// =======================================================================================
         /// client
         /// =======================================================================================
-        template <>
-        Client::Client(IPv4) : Element(::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) {}
-        template <>
-        Client::Client(IPv6) : Element(::socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0)) {}
-
-        Process wait(output::Connection, Client& self, Process proc, const Address& remote) {
+        Process
+        wait(output::Connection, Client& self, Client::Callback callback, const Address& remote) {
             auto& [host, port] = remote;
 
             // bind parameters
@@ -128,38 +123,45 @@ namespace stream {
 
             // find address
             for (auto rp = result; rp != NULL; rp = rp->ai_next) {
+                // create a client handler
+                auto h = Handler(
+                  ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
+
                 // try connect
-                auto res = ::connect(self.handler.native(), rp->ai_addr, rp->ai_addrlen);
+                auto res = ::connect(h.native(), rp->ai_addr, rp->ai_addrlen);
 
                 // check result
                 if (res != 0 && errno != EINPROGRESS)
                     continue;
 
+                // update resource handler
+                self.handler_ = std::move(h);
+
                 // run after input waitting
-                return [native = self.handler.native(), process = std::move(proc)] {
+                return [native = self.handler_.native(), callback = std::move(callback)] {
                     // check connection
                     auto result = int(0);
                     auto length = socklen_t(sizeof(result));
                     if (getsockopt(native, SOL_SOCKET, SO_ERROR, &result, &length) < 0 || result != 0)
                         throw std::system_error(std::make_error_code(std::errc::broken_pipe));
 
-                    // call the register process
-                    process();
+                    // back to main function
+                    callback();
                 };
             }
             // fallback
             throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
         }
 
-        void read(Client::Shared self, std::string& str) {
-            auto count = ::recv(self->handler.native(), str.data(), str.size(), 0);
+        auto read(Client::Shared self, std::string& str) -> void {
+            auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
             if (count <= 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)), "client::read");
             str.resize(count);
         }
 
-        void write(Client::Shared self, const std::string& str) {
-            if (::send(self->handler.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
+        auto write(Client::Shared self, const std::string& str) -> void {
+            if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)), "client::write");
         }
     } // namespace remote

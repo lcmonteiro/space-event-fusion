@@ -60,7 +60,6 @@ TEST(resources_stream_remote, positive_test) {
                     write(self, std::string("c"));
                 },
                 fusion::stream::remote::Address{"127.0.0.1", 10000});
-          },
-          fusion::stream::remote::IPv4());
+          });
     });
 }

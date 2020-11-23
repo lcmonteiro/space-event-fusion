@@ -39,7 +39,7 @@ Timer::Timer(
   const std::chrono::steady_clock::time_point& point,
   const std::chrono::milliseconds& duration)
   : Element{timerfd_create(CLOCK_MONOTONIC, 0)} {
-    setup(handler, point, duration);
+    setup(handler_, point, duration);
 }
 
 template <>
@@ -47,19 +47,19 @@ Timer::Timer(
   const std::chrono::system_clock::time_point& point,
   const std::chrono::milliseconds& duration)
   : Element{timerfd_create(CLOCK_REALTIME, 0)} {
-    setup(handler, point, duration);
+    setup(handler_, point, duration);
 }
 
-auto count(std::shared_ptr<Timer> self) -> size_t {
+size_t count(std::shared_ptr<Timer> self) {
     std::uint64_t u = 0;
-    if (::read(self->handler.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
+    if (::read(self->handler_.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
         throw std::system_error(std::make_error_code(std::errc(errno)), "timer::count:");
     return std::size_t(u);
 }
 
-auto clear(std::shared_ptr<Timer> self) -> void {
+void clear(std::shared_ptr<Timer> self) {
     std::uint64_t u = 0;
-    if (::read(self->handler.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
+    if (::read(self->handler_.native(), &u, sizeof(uint64_t)) != sizeof(uint64_t))
         throw std::system_error(std::make_error_code(std::errc(errno)), "timer::clear:");
 }
 } // namespace fusion

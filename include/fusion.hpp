@@ -1,8 +1,8 @@
 /// ===============================================================================================
-/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
-/// @file fusion.hpp                                                    _| |  | (_-<  |   _ \    \ 
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)
+/// @file fusion.hpp                                                    _| |  | (_-<  |   _ \    \
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
-/// @date November 20, 2020        
+/// @date November 20, 2020
 /// ===============================================================================================
 #pragma once
 
@@ -30,6 +30,9 @@ using Output = basetype<1>;
 using Input  = basetype<2>;
 using Error  = basetype<3>;
 
+// base 
+using Process = std::function<void()>;
+
 /// extended wainting types
 /// - Connection
 template <typename Type>
@@ -41,9 +44,10 @@ namespace input {
     using Connection = fusion::Connection<Input>;
 }
 
-/// process
-/// @brief
-using Process = std::function<void()>;
+// exceptions
+namespace exception {
+    struct Continue : std::runtime_error {};
+} // namespace exception
 
 
 /// ===============================================================================================
@@ -54,6 +58,9 @@ using Process = std::function<void()>;
 struct Handler {
     // deleted
     Handler(const Handler&) = delete;
+
+    // default
+    Handler() = default;
 
     /// constructor
     /// @brief
@@ -80,8 +87,6 @@ struct Handler {
     ~Handler();
 
   private:
-    /// @brief
-    ///
     int native_{-1};
 };
 
@@ -89,21 +94,20 @@ struct Handler {
 /// @brief
 struct Element {
   protected:
-    /// @brief
-    ///
-    Element(Handler&& id) : handler{std::move(id)} {}
+    Element() = default;
 
+    /// constructor
+    /// @brief
+    Element(Handler&& id) : handler_{std::move(id)} {}
 
   protected:
-    /// handler
-    /// @brief
-    Handler handler;
+    Handler handler_;
 };
 
 /// Cluster
 /// @brief
 struct Cluster {
-    using Shared = std::shared_ptr<Cluster>;
+    using Shared  = std::shared_ptr<Cluster>;
 
     /// wait
     /// @brief
@@ -111,16 +115,14 @@ struct Cluster {
     friend void wait(const Handler& handler, Shared& space, Process func);
 
   protected:
-    /// @brief
-    ///
-    Handler handler;
+    Handler handler_;
 };
 
 /// Space
 /// @brief
 struct Space {
-    using Shared = std::shared_ptr<Space>;
-
+    using Shared  = std::shared_ptr<Space>;
+    
     /// constructor
     /// @brief
     Space();
@@ -137,12 +139,9 @@ struct Space {
     friend void wait(Error, const Handler& handler, const Shared& space, Process func);
 
   private:
-    /// @brief
-    ///
-    Handler handler;
+    Handler handler_;
 
-    /// cache
-    /// @brief
+    /// processes cache
     std::unordered_map<int, std::tuple<int, std::map<int, Process>>> cache_;
 };
 
@@ -162,43 +161,39 @@ namespace {
         scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
 
       protected:
-        using Callable = std::function<void(Shared, Base)>;
-        
         /// wait
         /// @brief
-        template <typename Type, typename... Args>
-        friend void wait(Type, const Shared& scope, Callable func, Args&&... args) {
-            std::cout << __LINE__ << std::endl;
+        template <typename Action, typename Callable, typename... Args>
+        friend void wait(Action, const Shared& scope, Callable func, Args&&... args) {
             wait(
-              Type(),
-              scope->handler,
+              Action(),
+              scope->handler_,
               scope->base_,
               wait(
-                Type(),
+                Action(),
                 *scope,
-                [call = std::move(func), scope, next = scope->base_] { call(scope, next); },
+                [call = std::move(func), scope, next = scope->base_](auto... args) {
+                    call(scope, next, std::move(args)...);
+                },
                 std::forward<Args>(args)...));
         }
-        template <int n, typename... Args>
+        template <int n, typename Callable, typename... Args>
         friend void wait(basetype<n>, const Shared& scope, Callable func, Args&&... args) {
-            std::cout << __LINE__ << std::endl;
             wait(
               basetype<n>(),
-              scope->handler,
+              scope->handler_,
               scope->base_,
               [call = std::move(func), scope, next = scope->base_] { call(scope, next); });
         }
 
         /// wait
         /// @brief
-        template <typename Type>
-        friend void wait(Type, const Handler& handler, const Shared& scope, Process func) {
-            wait(Type(), handler, scope->base_, std::move(func));
+        template <typename Type, typename Process>
+        friend void wait(Type, const Handler& handler, const Shared& scope, Process&& func) {
+            wait(Type(), handler, scope->base_, std::forward<Process>(func));
         }
 
       private:
-        /// @brief
-        /// base element
         const Base base_;
     };
     template <typename Source>
