@@ -8,26 +8,30 @@
 /// Test
 /// @brief
 TEST(resources_stream_remote, positive_test) {
-    build<fusion::Space>([](auto self) {
+    std::string expect(100, 'c');
+    std::transform(
+      expect.begin(),
+      std::prev(expect.end()),
+      std::next(expect.begin()),
+      std::next(expect.begin()),
+      [](auto a, auto b) { return a != b ? 'c' : 's'; });
+
+    // process
+    std::string data(100, '\0');
+    build<fusion::Space>([&data](auto self) {
         // server
         build<fusion::stream::remote::Server>(
           self,
-          [](auto self, auto space) {          
-              wait<fusion::input::Connection>(self, [](auto self, auto space) {              
-                  function(self, [](auto self, auto process) {
-                      wait<fusion::Input>(self, [process](auto self, auto space) {
-                          std::string data(100, '\0');
+          [&data](auto self, auto space) {
+              wait<fusion::input::Connection>(self, [&data](auto self, auto space) {
+                  function(self, [&data](auto self, auto process) {
+                      wait<fusion::Input>(self, [&data, process](auto self, auto space) {
+                          data.resize(data.capacity());
                           read(self, data);
-                          std::cout << "rx= " << data << std::endl;
-                          build<fusion::Timer>(
-                            self,
-                            [data](auto self, auto space) {
-                                wait<fusion::Input>(self, [data](auto self, auto space) {
-                                    write(space, data + "s");
-                                });
-                            },
-                            std::chrono::system_clock::now() + std::chrono::seconds{1});
-                          function(self, process);
+                          write(self, data + "s");
+
+                          if (data.size() < 100)
+                              function(self, process);
                       });
                   });
               });
@@ -35,31 +39,25 @@ TEST(resources_stream_remote, positive_test) {
           fusion::stream::remote::Address{"localhost", 10000});
 
         // client
-        build<fusion::stream::remote::Client>(
-          self,
-          [](auto self, auto space) {              
-              wait<fusion::output::Connection>(
-                self,
-                [](auto self, auto space) {                    
-                    function(self, [](auto self, auto process) {
-                        wait<fusion::Input>(self, [process](auto self, auto space) {
-                            std::string data(100, '\0');
-                            read(self, data);
-                            std::cout << "rx= " << data << std::endl;
-                            build<fusion::Timer>(
-                              self,
-                              [data](auto self, auto space) {
-                                  wait<fusion::Input>(self, [data](auto self, auto space) {
-                                      write(space, data + "c");
-                                  });
-                              },
-                              std::chrono::system_clock::now() + std::chrono::seconds{1});
-                            function(self, process);
-                        });
-                    });
-                    write(self, std::string("c"));
-                },
-                fusion::stream::remote::Address{"127.0.0.1", 10000});
-          });
+        build<fusion::stream::remote::Client>(self, [&data](auto self, auto space) {
+            wait<fusion::output::Connection>(
+              self,
+              [&data](auto self, auto space) {
+                  function(self, [&data](auto self, auto process) {
+                      wait<fusion::Input>(self, [&data, process](auto self, auto space) {
+                          data.resize(data.capacity());
+                          read(self, data);
+                          write(self, data + "c");
+                          if (data.size() < 100)
+                              function(self, process);
+                      });
+                  });
+                  write(self, std::string("c"));
+              },
+              fusion::stream::remote::Address{"127.0.0.1", 10000});
+        });
     });
+
+    // check
+    EXPECT_EQ(expect, data);
 }

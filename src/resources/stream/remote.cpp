@@ -52,9 +52,9 @@ namespace stream {
 
                     // set options
                     int opt = 1;
-                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEADDR, (int*)&opt, sizeof(int)) < 0)
+                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
                         continue;
-                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEPORT, (int*)&opt, sizeof(int)) < 0)
+                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) < 0)
                         continue;
 
                     // bind address
@@ -153,14 +153,14 @@ namespace stream {
             throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
         }
 
-        auto read(Client::Shared self, std::string& str) -> void {
+        void read(Client::Shared self, std::string& str) {
             auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
             if (count <= 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)), "client::read");
             str.resize(count);
         }
 
-        auto write(Client::Shared self, const std::string& str) -> void {
+        void write(Client::Shared self, const std::string& str) {
             if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)), "client::write");
         }

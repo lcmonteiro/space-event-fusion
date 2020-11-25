@@ -1,8 +1,8 @@
 /// ===============================================================================================
-/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)
 /// @file local.hpp                                                     _| |  | (_-<  |   _ \    \ 
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
-/// @date November 20, 2020        
+/// @date November 20, 2020
 /// ===============================================================================================
 #pragma once
 
@@ -14,12 +14,13 @@ namespace message {
         using Address = std::string;
 
         /// =======================================================================================
-        /// server
+        /// Messenger
         /// @brief
         /// =======================================================================================
         class Messenger : public Element {
           public:
             using Shared = std::shared_ptr<Messenger>;
+
             /// constructor
             /// @param local address
             Messenger(const Address& source, const Address& destination);
@@ -33,6 +34,6 @@ namespace message {
             /// @brief
             friend void write(Shared self, const std::string& str);
         };
-    }
-}
-        
+    } // namespace local
+} // namespace message
+} // namespace fusion

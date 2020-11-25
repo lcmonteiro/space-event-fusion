@@ -7,38 +7,44 @@
 /// Test
 /// @brief
 TEST(resource_timer, positive_test) {
-    build<fusion::Space>([](auto self) {
+    // process
+    auto life = 10;
+    build<fusion::Space>([&life](auto self) {
+        // base timer
         build<fusion::Timer>(
           self,
-          [](auto self, auto space) {
-              auto entry_point = [self](auto entry_point) -> void {
-                  wait<fusion::Input>(self, [entry_point](auto self, auto space) {
-                      std::cout << "tick1..." << std::endl;
+          [&life](auto self, auto space) {
+              function(self, [&life](auto self, auto process) {
+                  wait<fusion::Input>(self, [&life, process](auto self, auto space) {
                       clear(self);
-                      entry_point(entry_point);
+                      if (life) {
+                          ++life;
+                          function(self, process);
+                      }
                   });
-              };
-              entry_point(entry_point);
+              });
 
+              // top timer
               build<fusion::Timer>(
                 self,
-                [](auto self, auto space) {
-                    auto entry_point = [self](auto entry_point) -> void {
-                        wait<fusion::Input>(self, [entry_point](auto self, auto space) {
-                            std::cout << "tick2..." << std::endl;
+                [&life](auto self, auto space) {
+                    function(self, [&life](auto self, auto process) {
+                        wait<fusion::Input>(self, [&life, process](auto self, auto space) {
                             clear(self);
-                            entry_point(entry_point);
+                            if (life) {
+                                --life;
+                                function(self, process);
+                            }
                         });
-                    };
-                    entry_point(entry_point);
+                    });
                 },
-                std::chrono::system_clock::now(),
-                std::chrono::seconds{1});
+                std::chrono::system_clock::now() + std::chrono::milliseconds{300},
+                std::chrono::milliseconds{40});
           },
-          std::chrono::system_clock::now() + std::chrono::seconds{5},
-          std::chrono::seconds{1});
+          std::chrono::system_clock::now(),
+          std::chrono::milliseconds{120});
     });
 
-    // Check
-    EXPECT_EQ(1, 1);
+    // check
+    EXPECT_EQ(0, life);
 }

@@ -10,6 +10,7 @@ add_library(event-fusion
 	./src/fusion.cpp
 	./src/resources/timer.cpp
 	./src/resources/stream/remote.cpp
+	./src/resources/message/local.cpp
 )
 
 # includes
