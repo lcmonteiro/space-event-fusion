@@ -128,7 +128,7 @@ void wait(Error, const Handler& handler, const Space::Shared& space, Process fun
 /// Cluster implementation
 /// - wait
 /// ===============================================================================================
-/// 
+///
 /// @brief
 ///
 void wait(const Handler& handler, Cluster::Shared space, Process func) {

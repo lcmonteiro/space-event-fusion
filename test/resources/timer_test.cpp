@@ -14,12 +14,12 @@ TEST(resource_timer, positive_test) {
         build<fusion::Timer>(
           self,
           [&life](auto self, auto space) {
-              function(self, [&life](auto self, auto process) {
-                  wait<fusion::Input>(self, [&life, process](auto self, auto space) {
+              call(self, [&life](auto self, auto scope) {
+                  wait<fusion::Input>(scope, [&life, callable = self](auto self, auto space) {
                       clear(self);
                       if (life) {
                           ++life;
-                          function(self, process);
+                          call(self, callable);
                       }
                   });
               });
@@ -28,12 +28,12 @@ TEST(resource_timer, positive_test) {
               build<fusion::Timer>(
                 self,
                 [&life](auto self, auto space) {
-                    function(self, [&life](auto self, auto process) {
-                        wait<fusion::Input>(self, [&life, process](auto self, auto space) {
+                    call(self, [&life](auto self, auto scope) {
+                        wait<fusion::Input>(scope, [&life, callable = self](auto self, auto space) {
                             clear(self);
                             if (life) {
                                 --life;
-                                function(self, process);
+                                call(self, callable);
                             }
                         });
                     });

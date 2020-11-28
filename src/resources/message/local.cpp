@@ -20,34 +20,39 @@ namespace message {
         /// =======================================================================================
         /// Messenger
         /// - constructor
-        /// - read 
+        /// - read
         /// - write
         /// =======================================================================================
-        Messenger::Messenger(const Address& source, const Address& destination)
-          : Element([&source, &destination] {
-                sockaddr_un addr;
-
+        Messenger::Messenger(const Address& source)
+          : Element([&source] {
+                struct sockaddr_un addr;
+                std::memset(&addr, 0, sizeof(addr));
                 // create a messanger handler
-                auto h = Handler(::socket(PF_LOCAL, SOCK_DGRAM | SOCK_NONBLOCK, 0));
-
+                auto handler = Handler(::socket(PF_LOCAL, SOCK_DGRAM, 0));
                 // bind source
                 addr.sun_family  = PF_LOCAL;
                 addr.sun_path[0] = '\0';
                 std::strncpy(&addr.sun_path[1], source.data(), sizeof(addr.sun_path) - 2);
-                if (::bind(h.native(), (sockaddr*)&addr, sizeof(addr)) < 0)
+                if (::bind(handler.native(), (struct sockaddr*)&addr, sizeof(addr)) < 0)
                     throw std::system_error(std::make_error_code(std::errc(errno)));
+                return handler;
+            }()) {}
 
+        Process
+        wait(output::Connection, Messenger& self, Callback<> callable, const Address& destination) {
+            return [native = self.handler_.native(), callable = std::move(callable), destination] {
+                struct sockaddr_un addr;
+                std::memset(&addr, 0, sizeof(addr));
                 // connect to destination
                 addr.sun_family  = PF_LOCAL;
                 addr.sun_path[0] = '\0';
                 std::strncpy(&addr.sun_path[1], destination.data(), sizeof(addr.sun_path) - 2);
-                if (::connect(h.native(), (sockaddr*)&addr, sizeof(addr)) < 0)
+                if (::connect(native, (struct sockaddr*)&addr, sizeof(addr)) < 0)
                     throw std::system_error(std::make_error_code(std::errc(errno)));
-
-                // return handler
-                return h;
-            }()) {}
-
+                // back to main function
+                callable();
+            };
+        }
 
         void read(Messenger::Shared self, std::string& str) {
             auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);

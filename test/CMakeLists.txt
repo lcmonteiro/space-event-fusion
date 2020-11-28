@@ -39,5 +39,5 @@ TEST_SOURCES
 	./fusion_test.cpp
 	./resources/timer_test.cpp
 	./resources/stream/remote_test.cpp
-#	./resources/message/local_test.cpp
+	./resources/message/local_test.cpp
 )

@@ -26,12 +26,17 @@ struct basetype {
     constexpr static int id = n;
     explicit basetype()     = default;
 };
-using Output = basetype<1>;
-using Input  = basetype<2>;
-using Error  = basetype<3>;
+using Output  = basetype<1>;
+using Input   = basetype<2>;
+using Error   = basetype<3>;
+using Destroy = basetype<-1>;
 
-// base 
+// base
 using Process = std::function<void()>;
+
+// callback
+template <typename... Args>
+using Callback = std::function<void(Args...)>;
 
 /// extended wainting types
 /// - Connection
@@ -107,7 +112,7 @@ struct Element {
 /// Cluster
 /// @brief
 struct Cluster {
-    using Shared  = std::shared_ptr<Cluster>;
+    using Shared = std::shared_ptr<Cluster>;
 
     /// wait
     /// @brief
@@ -121,8 +126,8 @@ struct Cluster {
 /// Space
 /// @brief
 struct Space {
-    using Shared  = std::shared_ptr<Space>;
-    
+    using Shared = std::shared_ptr<Space>;
+
     /// constructor
     /// @brief
     Space();
@@ -158,7 +163,8 @@ namespace {
         /// constructor
         /// @brief
         template <typename... Args>
-        scope(Base base, Args&&... args) : Source(std::forward<Args>(args)...), base_(base) {}
+        scope(Base base, Args&&... args)
+          : Source(std::forward<Args>(args)...), base_(base), destroy_() {}
 
       protected:
         /// wait
@@ -185,6 +191,10 @@ namespace {
               scope->base_,
               [call = std::move(func), scope, next = scope->base_] { call(scope, next); });
         }
+        // template <typename Callable, typename... Args>
+        // friend void wait(Destroy, const Shared& scope, Callable func, Args&&... args) {
+        //     scope->destroy_ = [call = std::move(func), scope, next = scope->base_] { call(scope, next); };
+        // }
 
         /// wait
         /// @brief
@@ -195,6 +205,7 @@ namespace {
 
       private:
         const Base base_;
+        Process destroy_;
     };
     template <typename Source>
     struct scope<Source, void> : Source {
@@ -243,7 +254,7 @@ void wait(Shared&& scope, Callable&& callable, Args&&... args) {
 /// @brief
 ///
 /// ===============================================================================================
-template <typename Space, typename Process>
-void function(Space space, Process func) {
-    func(space, func);
+template <typename Scope, typename Callable>
+void call(Scope scope, Callable func) {
+    func(func, scope);
 }

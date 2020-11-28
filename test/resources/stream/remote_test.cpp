@@ -24,14 +24,14 @@ TEST(resources_stream_remote, positive_test) {
           self,
           [&data](auto self, auto space) {
               wait<fusion::input::Connection>(self, [&data](auto self, auto space) {
-                  function(self, [&data](auto self, auto process) {
-                      wait<fusion::Input>(self, [&data, process](auto self, auto space) {
+                  call(self, [&data](auto self, auto scope) {
+                      wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
                           data.resize(data.capacity());
                           read(self, data);
                           write(self, data + "s");
 
                           if (data.size() < 100)
-                              function(self, process);
+                              call(self, callable);
                       });
                   });
               });
@@ -43,13 +43,13 @@ TEST(resources_stream_remote, positive_test) {
             wait<fusion::output::Connection>(
               self,
               [&data](auto self, auto space) {
-                  function(self, [&data](auto self, auto process) {
-                      wait<fusion::Input>(self, [&data, process](auto self, auto space) {
+                  call(self, [&data](auto self, auto scope) {
+                      wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
                           data.resize(data.capacity());
                           read(self, data);
                           write(self, data + "c");
                           if (data.size() < 100)
-                              function(self, process);
+                              call(self, callable);
                       });
                   });
                   write(self, std::string("c"));

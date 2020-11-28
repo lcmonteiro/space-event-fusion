@@ -4,16 +4,41 @@
 
 #include "resources/message/local.hpp"
 
+
+
+#include <cstring>
+#include <memory>
+#include <stdexcept>
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+
 /// Test
 /// @brief
 TEST(resources_message_local, positive_test) {
-    std::string expect(100, 'c');
-    std::transform(
-      expect.begin(),
-      std::prev(expect.end()),
-      std::next(expect.begin()),
-      std::next(expect.begin()),
-      [](auto a, auto b) { return a != b ? 'c' : 's'; });
+
+    sockaddr_un addr;
+    std::memset(&addr, 0, sizeof(addr));
+
+    // create a messanger handler
+    // auto h1 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
+    // auto h2 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
+    // auto h3 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
+
+    // bind(h1, "aaaaa");
+    // connect(h1, "bbbbb");
+    // bind(h2, "bbbbb");
+    // bind(h3, "ccccc");
+    // connect(h1, "bbbbb");
+    // connect(h2, "ccccc");
+    // connect(h2, "aaaaa");
+    // return;
+
+
+
+    std::string expect(100, 'i');
 
     // process
     std::string data(100, '\0');
@@ -22,37 +47,44 @@ TEST(resources_message_local, positive_test) {
         build<fusion::message::local::Messenger>(
           self,
           [&data](auto self, auto space) {
-              function(self, [&data](auto self, auto process) {
-                  wait<fusion::Input>(self, [&data, process](auto self, auto space) {
-                      data.resize(data.capacity());
-                      read(self, data);
-                      write(self, data + "s");
-
-                      if (data.size() < 100)
-                          function(self, process);
-                  });
-              });
+              wait<fusion::output::Connection>(
+                self,
+                [&data](auto self, auto space) {
+                    call(self, [&data](auto self, auto scope) {
+                        wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
+                            data.resize(data.capacity());
+                            read(self, data);
+                            write(self, data + "i");
+                            if (data.size() < 100)
+                                call(self, callable);
+                        });
+                    });
+                },
+                fusion::message::local::Address{"bbbb"});
           },
-          fusion::message::local::Address{"aaaa"},
-          fusion::message::local::Address{"bbbb"});
+          fusion::message::local::Address{"aaaa"});
 
         // pong
         build<fusion::message::local::Messenger>(
           self,
           [&data](auto self, auto space) {
-              function(self, [&data](auto self, auto process) {
-                  wait<fusion::Input>(self, [&data, process](auto self, auto space) {
-                      data.resize(data.capacity());
-                      read(self, data);
-                      write(self, data + "c");
-                      if (data.size() < 100)
-                          function(self, process);
-                  });
-              });
-              write(self, std::string("c"));
+              wait<fusion::output::Connection>(
+                self,
+                [&data](auto self, auto space) {
+                    call(self, [&data](auto self, auto scope) {
+                        wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
+                            data.resize(data.capacity());
+                            read(self, data);
+                            write(self, data + "i");
+                            if (data.size() < 100)
+                                call(self, callable);
+                        });
+                    });
+                    write(self, std::string("i"));
+                },
+                fusion::message::local::Address{"aaaa"});
           },
-          fusion::message::local::Address{"bbbb"},
-          fusion::message::local::Address{"aaaa"});
+          fusion::message::local::Address{"bbbb"});
     });
 
     // check

@@ -14,8 +14,8 @@ TEST(fusion_space, positive_test) {
           self,
           [](auto self, auto space) {
               wait<fusion::input::Connection>(self, [](auto self, auto space) {
-                  function(self, [](auto self, auto process) {
-                      wait<fusion::Input>(self, [process](auto self, auto space) {
+                  call(self, [](auto self, auto scope) {
+                      wait<fusion::Input>(scope, [callable = self](auto self, auto space) {
                           std::string data(100, '\0');
                           read(self, data);
                           std::cout << "rx= " << data << std::endl;
@@ -28,7 +28,7 @@ TEST(fusion_space, positive_test) {
                             },
                             std::chrono::system_clock::now() + std::chrono::milliseconds{10});
                           if (data.size() < data.capacity())
-                              function(self, process);
+                              call(self, callable);
                       });
                   });
               });
@@ -40,8 +40,8 @@ TEST(fusion_space, positive_test) {
             wait<fusion::output::Connection>(
               self,
               [](auto self, auto space) {
-                  function(self, [](auto self, auto process) {
-                      wait<fusion::Input>(self, [process](auto self, auto space) {
+                  call(self, [](auto self, auto scope) {
+                      wait<fusion::Input>(scope, [callable = self](auto self, auto space) {
                           std::string data(100, '\0');
                           read(self, data);
                           std::cout << "rx= " << data << std::endl;
@@ -54,7 +54,7 @@ TEST(fusion_space, positive_test) {
                             },
                             std::chrono::system_clock::now() + std::chrono::milliseconds{20});
                           if (data.size() < data.capacity())
-                              function(self, process);
+                              call(self, callable);
                       });
                   });
                   write(self, std::string("c"));

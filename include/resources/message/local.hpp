@@ -23,9 +23,15 @@ namespace message {
 
             /// constructor
             /// @param local address
-            Messenger(const Address& source, const Address& destination);
+            Messenger(const Address& source);
 
           protected:
+            /// wait connection
+            /// @brief
+            /// @param remote address
+            friend Process
+            wait(output::Connection, Messenger&, Callback<>, const Address& destination);
+
             /// read
             /// @brief
             friend void read(Shared self, std::string& str);
