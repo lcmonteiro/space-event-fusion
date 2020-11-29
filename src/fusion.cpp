@@ -25,7 +25,7 @@ namespace fusion {
 template <>
 Handler::Handler(int h) : native_{h} {
     if (native_ < 0)
-        throw std::runtime_error(std::string("resource: ") + strerror(errno));
+        throw std::system_error(std::make_error_code(std::errc(errno)));
 }
 
 Handler::~Handler() {
@@ -124,14 +124,4 @@ void wait(Error, const Handler& handler, const Space::Shared& space, Process fun
     wait<Error::id, EPOLLERR>(space->handler_, space->cache_, handler, func);
 }
 
-/// ===============================================================================================
-/// Cluster implementation
-/// - wait
-/// ===============================================================================================
-///
-/// @brief
-///
-void wait(const Handler& handler, Cluster::Shared space, Process func) {
-    std::cout << __func__ << "" << __LINE__ << std::endl;
-}
 } // namespace fusion

@@ -26,10 +26,10 @@ struct basetype {
     constexpr static int id = n;
     explicit basetype()     = default;
 };
-using Output  = basetype<1>;
-using Input   = basetype<2>;
-using Error   = basetype<3>;
-using Destroy = basetype<-1>;
+using Output = basetype<1>;
+using Input  = basetype<2>;
+using Error  = basetype<3>;
+using Delete = basetype<-1>;
 
 // base
 using Process = std::function<void()>;
@@ -95,7 +95,7 @@ struct Handler {
     int native_{-1};
 };
 
-/// Cluster
+/// Element
 /// @brief
 struct Element {
   protected:
@@ -109,19 +109,6 @@ struct Element {
     Handler handler_;
 };
 
-/// Cluster
-/// @brief
-struct Cluster {
-    using Shared = std::shared_ptr<Cluster>;
-
-    /// wait
-    /// @brief
-    ///
-    friend void wait(const Handler& handler, Shared& space, Process func);
-
-  protected:
-    Handler handler_;
-};
 
 /// Space
 /// @brief
@@ -164,13 +151,13 @@ namespace {
         /// @brief
         template <typename... Args>
         scope(Base base, Args&&... args)
-          : Source(std::forward<Args>(args)...), base_(base), destroy_() {}
+          : Source(std::forward<Args>(args)...), base_(base), delete_() {}
 
       protected:
         /// wait
         /// @brief
         template <typename Action, typename Callable, typename... Args>
-        friend void wait(Action, const Shared& scope, Callable func, Args&&... args) {
+        friend constexpr void wait(Action, const Shared& scope, Callable func, Args&&... args) {
             wait(
               Action(),
               scope->handler_,
@@ -178,34 +165,62 @@ namespace {
               wait(
                 Action(),
                 *scope,
-                [call = std::move(func), scope, next = scope->base_](auto... args) {
-                    call(scope, next, std::move(args)...);
+                [call = std::move(func), guard = Guard(scope), next = scope->base_](auto... args) {
+                    call(guard.scope, next, std::move(args)...);
                 },
                 std::forward<Args>(args)...));
         }
+
+        /// wait
+        /// @brief
         template <int n, typename Callable, typename... Args>
-        friend void wait(basetype<n>, const Shared& scope, Callable func, Args&&... args) {
+        friend constexpr void
+        wait(basetype<n>, const Shared& scope, Callable func, Args&&... args) {
             wait(
               basetype<n>(),
               scope->handler_,
               scope->base_,
-              [call = std::move(func), scope, next = scope->base_] { call(scope, next); });
+              [call = std::move(func), guard = Guard(scope), next = scope->base_] {
+                  call(guard.scope, next);
+              });
         }
-        // template <typename Callable, typename... Args>
-        // friend void wait(Destroy, const Shared& scope, Callable func, Args&&... args) {
-        //     scope->destroy_ = [call = std::move(func), scope, next = scope->base_] { call(scope, next); };
-        // }
 
         /// wait
         /// @brief
+        template <typename Callable, typename... Args>
+        friend constexpr void wait(Delete, const Shared& scope, Callable func, Args&&... args) {
+            scope->destroy_ = [call = std::move(func), scope, next = scope->base_] {
+                call(scope, next);
+            };
+        }
+
+        /// wait
+        /// @brief recursive method until space fusion
         template <typename Type, typename Process>
-        friend void wait(Type, const Handler& handler, const Shared& scope, Process&& func) {
+        friend constexpr void
+        wait(Type, const Handler& handler, const Shared& scope, Process&& func) {
             wait(Type(), handler, scope->base_, std::forward<Process>(func));
         }
 
+      protected:
+        /// wait
+        /// @brief
+        struct Guard {
+            Guard(const Shared& _scope) : scope(_scope) {}
+            ~Guard() {
+                if (scope.use_count() == 1)
+                    if (scope->delete_)
+                        scope->delete_(scope, scope->base_);
+            }
+            Shared scope;
+        };
+
       private:
+        // base space
         const Base base_;
-        Process destroy_;
+
+        // callback before end
+        std::function<void(const Shared&, const Base&)> delete_;
     };
     template <typename Source>
     struct scope<Source, void> : Source {

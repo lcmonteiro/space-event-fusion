@@ -5,39 +5,9 @@
 #include "resources/message/local.hpp"
 
 
-
-#include <cstring>
-#include <memory>
-#include <stdexcept>
-
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
-
 /// Test
 /// @brief
 TEST(resources_message_local, positive_test) {
-
-    sockaddr_un addr;
-    std::memset(&addr, 0, sizeof(addr));
-
-    // create a messanger handler
-    // auto h1 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
-    // auto h2 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
-    // auto h3 = ::socket(PF_LOCAL, SOCK_DGRAM, 0);
-
-    // bind(h1, "aaaaa");
-    // connect(h1, "bbbbb");
-    // bind(h2, "bbbbb");
-    // bind(h3, "ccccc");
-    // connect(h1, "bbbbb");
-    // connect(h2, "ccccc");
-    // connect(h2, "aaaaa");
-    // return;
-
-
-
     std::string expect(100, 'i');
 
     // process
