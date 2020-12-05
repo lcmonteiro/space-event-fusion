@@ -28,7 +28,7 @@ namespace message {
                 struct sockaddr_un addr;
                 std::memset(&addr, 0, sizeof(addr));
                 // create a messanger handler
-                auto handler = Handler(::socket(PF_LOCAL, SOCK_DGRAM, 0));
+                auto handler = Handler(::socket(PF_LOCAL, SOCK_DGRAM | SOCK_NONBLOCK, 0));
                 // bind source
                 addr.sun_family  = PF_LOCAL;
                 addr.sun_path[0] = '\0';
@@ -54,15 +54,25 @@ namespace message {
             };
         }
 
-        void read(Messenger::Shared self, std::string& str) {
-            auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
+        void read(Messenger::Shared self, Buffer& buf) {
+            auto count = ::recv(self->handler_.native(), buf.data(), buf.size(), 0);
             if (count <= 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)));
-            str.resize(count);
+            buf.resize(count);
+        }
+        void read(Messenger::Shared self, std::string& buf) {
+            auto count = ::recv(self->handler_.native(), buf.data(), buf.size(), 0);
+            if (count <= 0)
+                throw std::system_error(std::make_error_code(std::errc(errno)));
+            buf.resize(count);
         }
 
-        void write(Messenger::Shared self, const std::string& str) {
-            if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
+        void write(Messenger::Shared self, const Buffer& buf) {
+            if (::send(self->handler_.native(), buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
+                throw std::system_error(std::make_error_code(std::errc(errno)));
+        }
+        void write(Messenger::Shared self, const std::string& buf) {
+            if (::send(self->handler_.native(), buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
                 throw std::system_error(std::make_error_code(std::errc(errno)));
         }
 

@@ -119,6 +119,10 @@ struct Space {
     /// @brief
     Space();
 
+    /// destructor
+    /// @brief
+    ~Space();
+
     /// run
     /// @brief
     void run();
@@ -131,10 +135,13 @@ struct Space {
     friend void wait(Error, const Handler& handler, const Shared& space, Process func);
 
   private:
-    Handler handler_;
+    struct Cache;
 
-    /// processes cache
-    std::unordered_map<int, std::tuple<int, std::map<int, Process>>> cache_;
+    /// native resource handler
+    const Handler handler_;
+
+    /// state cache
+    const std::unique_ptr<Cache> cache_;
 };
 
 /// ===============================================================================================
@@ -203,7 +210,7 @@ namespace {
         }
 
       protected:
-        /// wait
+        /// scope guard
         /// @brief
         struct Guard {
             Guard(const Shared& _scope) : scope(_scope) {}

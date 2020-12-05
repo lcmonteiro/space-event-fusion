@@ -6,12 +6,15 @@
 /// ===============================================================================================
 #pragma once
 
+#include <vector>
+
 #include "fusion.hpp"
 
 namespace fusion {
 namespace message {
     namespace local {
         using Address = std::string;
+        using Buffer  = std::vector<std::byte>;
 
         /// =======================================================================================
         /// Messenger
@@ -34,12 +37,15 @@ namespace message {
 
             /// read
             /// @brief
-            friend void read(Shared self, std::string& str);
+            friend void read(Shared self, Buffer& buf);
+            friend void read(Shared self, std::string& buf);
 
             /// write
             /// @brief
-            friend void write(Shared self, const std::string& str);
+            friend void write(Shared self, const Buffer& buf);
+            friend void write(Shared self, const std::string& buf);
         };
+
     } // namespace local
 } // namespace message
 } // namespace fusion
