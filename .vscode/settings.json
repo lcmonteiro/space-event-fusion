@@ -68,7 +68,8 @@
         "cfenv": "cpp",
         "typeindex": "cpp",
         "*.ipp": "cpp",
-        "cassert": "cpp"
+        "cassert": "cpp",
+        "cerrno": "cpp"
     },
     "cSpell.words": [
         "EPOLLIN",

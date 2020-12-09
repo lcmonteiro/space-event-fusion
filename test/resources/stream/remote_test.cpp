@@ -8,7 +8,9 @@
 /// Test
 /// @brief
 TEST(resources_stream_remote, positive_test) {
-    std::string expect(100, 'c');
+    constexpr auto NBYTES = 100;
+
+    std::string expect(NBYTES, 'c');
     std::transform(
       expect.begin(),
       std::prev(expect.end()),
@@ -17,7 +19,7 @@ TEST(resources_stream_remote, positive_test) {
       [](auto a, auto b) { return a != b ? 'c' : 's'; });
 
     // process
-    std::string data(100, '\0');
+    std::string data(NBYTES, '\0');
     build<fusion::Space>([&data](auto self) {
         // server
         build<fusion::stream::remote::Server>(
@@ -30,7 +32,7 @@ TEST(resources_stream_remote, positive_test) {
                           read(self, data);
                           write(self, data + "s");
 
-                          if (data.size() < 100)
+                          if (data.size() < data.capacity())
                               call(self, callable);
                       });
                   });
@@ -48,7 +50,7 @@ TEST(resources_stream_remote, positive_test) {
                           data.resize(data.capacity());
                           read(self, data);
                           write(self, data + "c");
-                          if (data.size() < 100)
+                          if (data.size() < data.capacity())
                               call(self, callable);
                       });
                   });

@@ -60,61 +60,77 @@ namespace exception {
 /// @brief
 ///
 /// ===============================================================================================
-struct Handler {
-    // deleted
-    Handler(const Handler&) = delete;
+// struct Handler {
+//     // deleted
+//     Handler(const Handler&) = delete;
 
-    // default
-    Handler() = default;
+//     // default
+//     Handler() = default;
 
-    /// constructor
-    /// @brief
-    template <typename Native>
-    Handler(Native id);
+//     /// constructor
+//     /// @brief
+//     template <typename Native>
+//     Handler(Native id);
 
-    /// move constructor
-    /// @brief
-    Handler(Handler&& h) { std::swap(native_, h.native_); }
+//     /// move constructor
+//     /// @brief
+//     Handler(Handler&& h) { std::swap(native_, h.native_); }
 
-    /// move assign
-    /// @brief
-    Handler& operator=(Handler&& h) {
-        std::swap(native_, h.native_);
-        return *this;
-    }
+//     /// move assign
+//     /// @brief
+//     Handler& operator=(Handler&& h) {
+//         std::swap(native_, h.native_);
+//         return *this;
+//     }
 
-    /// native
-    /// @brief
-    auto native() const { return native_; }
+//     /// native
+//     /// @brief
+//     auto native() const { return native_; }
 
-    /// destructor
-    /// @brief
-    ~Handler();
+//     /// destructor
+//     /// @brief
+//     ~Handler();
 
-  private:
-    int native_{-1};
-};
+//   private:
+//     int native_{-1};
+// };
 
 /// Element
 /// @brief
 struct Element {
-  protected:
-    Element() = default;
+    struct Handler;
+    using Shared = std::shared_ptr<Handler>;
 
-    /// constructor
+  protected:
+    /// base constructor
     /// @brief
-    Element(Handler&& id) : handler_{std::move(id)} {}
+    Element();
 
-  protected:
-    Handler handler_;
+    /// base destructor
+    /// @brief
+    ~Element();
+
+    /// native constructor
+    /// @brief
+    template <typename Native>
+    Element(Native handler);
+
+    /// native interface
+    /// @brief
+    template <typename Result, typename... Args>
+    Result native(Args&&... args);
+
+    /// native handler
+    /// @brief
+    const std::shared_ptr<Handler> handler_;
 };
 
 
 /// Space
 /// @brief
 struct Space {
-    using Shared = std::shared_ptr<Space>;
 
+    using Pointer = std::shared_ptr<Space>;
     /// constructor
     /// @brief
     Space();
@@ -130,18 +146,15 @@ struct Space {
   protected:
     /// wait
     /// @brief
-    friend void wait(Input, const Handler& handler, const Shared& space, Process func);
-    friend void wait(Output, const Handler& handler, const Shared& space, Process func);
-    friend void wait(Error, const Handler& handler, const Shared& space, Process func);
+    friend void wait(Input, const Element::Shared& handler, const Pointer& space, Process&& func);
+    friend void wait(Output, const Element::Shared& handler, const Pointer& space, Process&& func);
+    friend void wait(Error, const Element::Shared& handler, const Pointer& space, Process&& func);
 
   private:
-    struct Cache;
+    struct Handler;
 
     /// native resource handler
-    const Handler handler_;
-
-    /// state cache
-    const std::unique_ptr<Cache> cache_;
+    const std::unique_ptr<Handler> handler_;
 };
 
 /// ===============================================================================================
@@ -203,7 +216,7 @@ namespace {
 
         /// wait
         /// @brief recursive method until space fusion
-        template <typename Type, typename Process>
+        template <typename Type, typename Handler, typename Process>
         friend constexpr void
         wait(Type, const Handler& handler, const Shared& scope, Process&& func) {
             wait(Type(), handler, scope->base_, std::forward<Process>(func));

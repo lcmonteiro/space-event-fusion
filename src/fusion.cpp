@@ -7,33 +7,46 @@
 #include "fusion.hpp"
 
 #include <error.h>
-#include <string.h>
 #include <sys/epoll.h>
 #include <sys/poll.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstring>
+#include <set>
 #include <system_error>
 
 namespace fusion {
 
+
 /// ===============================================================================================
-/// Handler implementation
+/// Element Handler implementation
 /// - constructor
 /// - desctructor
 /// ===============================================================================================
+struct Element::Handler {
+    int native{-1};
+    std::tuple<int, int> events;
+    std::tuple<Process, Process, Process> binds;
+};
+
+Element::Element() : handler_{std::make_shared<Handler>()} {}
 
 template <>
-Handler::Handler(int h) : native_{h} {
-    if (native_ < 0)
+Element::Element(int native) : handler_{std::make_shared<Handler>()} {
+    if (native < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
+    handler_->native = native;
 }
 
-Handler::~Handler() {
-    if (native_ > 0)
-        close(native_);
+template <>
+int Element::native() {
+    return handler_->native;
 }
 
+Element::~Element() {
+    close(handler_->native);
+}
 
 /// ===============================================================================================
 /// Space implementation
@@ -46,127 +59,137 @@ constexpr int INPUT  = EPOLLIN;
 constexpr int OUTPUT = EPOLLOUT;
 constexpr int ERROR  = EPOLLERR | EPOLLHUP;
 
-/// cache
-/// @brief
-struct Space::Cache {
-    struct Resource {
-        struct State {
-            int curr{0};
-            int next{0};
-        } state;
-        std::map<int, Process> callables;
-    };
-    std::unordered_map<int, Resource> resources;
+///
+struct Space::Handler {
+    int native{-1};
+    std::unordered_map<Element::Handler*, Element::Shared> cache;
 };
 
+/// Wait
+/// @brief
+template <int i, int flags, typename Source, typename Base, typename Process>
+void wait(const Source& source, const Base& base, Process& proc) {
+    // update future
+    std::get<i>(source->binds) = proc;
+    std::get<1>(source->events) |= flags;
+
+    // update state
+    if (std::get<0>(source->events) != std::get<1>(source->events)) {
+        // update element
+        auto [_, result] = base->cache.emplace(source.get(), source);
+
+        // update events
+        epoll_event ev;
+        ev.events   = std::get<1>(source->events);
+        ev.data.ptr = source.get();
+        if (result)
+            assert(::epoll_ctl(base->native, EPOLL_CTL_ADD, source->native, &ev) == 0);
+        else
+            assert(::epoll_ctl(base->native, EPOLL_CTL_MOD, source->native, &ev) == 0);
+
+        // update current
+        std::get<0>(source->events) = ev.events;
+    }
+}
+
+/// process
+/// @brief
+template <int i, int flags, typename Event, typename Source>
+static inline void process(const Event& events, Source* source) {
+    if (events & flags & std::get<1>(source->events)) {
+        // remove
+        std::get<1>(source->events) &= ~flags;
+        auto callable = std::move(std::get<i>(source->binds));
+        try {
+            // execute
+            callable();
+        }
+        catch (const exception::Continue&) {
+            // reinsert
+            std::get<1>(source->events) |= flags;
+            std::get<i>(source->binds) = std::move(callable);
+        }
+        catch (const std::exception& e) {
+            // error
+            std::cerr << "space::run:" << e.what() << std::endl;
+        }
+    }
+}
+
+/// cleanup
+/// @brief
+template <typename Event, typename Source, typename Base>
+static inline void cleanup(Event& events, Source* source, Base* handler) {
+    if (std::get<1>(source->events) == 0) {
+        handler->cache.erase(source);
+        return;
+    }
+    if (events & ERROR) {
+        auto fds = std::array{pollfd{.fd = source->native, .events = 0, .revents = 0}};
+        if (::poll(fds.data(), fds.size(), 0) < 0 || fds.front().revents) {
+            source->binds = std::tuple{nullptr, nullptr, nullptr};
+            handler->cache.erase(source);
+            return;
+        }
+    }
+    if (std::get<1>(source->events) != std::get<0>(source->events)) {
+        epoll_event ev;
+        ev.events   = std::get<1>(source->events);
+        ev.data.ptr = source;
+        assert(::epoll_ctl(handler->native, EPOLL_CTL_MOD, source->native, &ev) == 0);
+        std::get<0>(source->events) = events;
+    }
+}
 
 /// constructor
 /// @brief
-Space::Space() : handler_{::epoll_create1(0)}, cache_{std::make_unique<Cache>()} {}
+Space::Space() : handler_{std::make_unique<Handler>()} {
+    handler_->native = ::epoll_create1(0);
+}
 
 /// destructor
 /// @brief
-Space::~Space() = default;
+Space::~Space() {
+    close(handler_->native);
+}
 
 /// run
 /// @brief
 void Space::run() {
-    auto events     = std::vector<epoll_event>(10);
-    auto& resources = cache_->resources;
-
+    auto events = std::vector<epoll_event>(10);
     // run until empty cache
-    while (!resources.empty()) {
+    while (!handler_->cache.empty()) {
         // wait for events
-        auto count = ::epoll_wait(handler_.native(), events.data(), events.size(), -1);
+        auto count = ::epoll_wait(handler_->native, events.data(), events.size(), -1);
 
         // check error
         if (count < 0)
             throw std::system_error(std::make_error_code(std::errc(errno)));
-
+        
         // process events
-        constexpr auto EVENT_MAP = std::array{
-          std::tuple{Input::id, INPUT},
-          std::tuple{Output::id, OUTPUT},
-          std::tuple{Error::id, ERROR}};
         events.resize(count);
         for (auto& ev : events) {
-            // find resource cached processes
-            auto& resource = resources[ev.data.fd];
-            // process resource events
-            for (auto& [id, mask] : EVENT_MAP) {
-                if (ev.events & mask & resource.state.next) {
-                    // remove
-                    resource.state.next &= ~mask;
-                    auto node = resource.callables.extract(id);
-                    try {
-                        // execute
-                        node.mapped()();
-                    }
-                    catch (const exception::Continue&) {
-                        // reinsert
-                        resource.state.next |= mask;
-                        resource.callables.insert(std::move(node));
-                    }
-                    catch (const std::exception& e) {
-                        std::cerr << "space::run:" << e.what() << std::endl;
-                    }
-                }
-            }
-            // no callables
-            if (resource.state.next == 0) {
-                resources.erase(ev.data.fd);
-                continue;
-            }
-            // error handling
-            if (ev.events & ERROR) {
-                auto fds = std::array{pollfd{.fd = ev.data.fd, .events = 0, .revents = 0}};
-                if (::poll(fds.data(), fds.size(), 0) < 0 || fds.front().revents) {
-                    resources.erase(ev.data.fd);
-                    continue;
-                }
-            }
-            // sync events
-            if (resource.state.next != resource.state.curr) {
-                ev.events = resource.state.next;
-                assert(::epoll_ctl(handler_.native(), EPOLL_CTL_MOD, ev.data.fd, &ev) == 0);
-                resource.state.curr = ev.events;
-            }
+            auto source = reinterpret_cast<Element::Handler*>(ev.data.ptr);
+            auto events = ev.events;
+
+            process<0, INPUT>(events, source);
+            process<1, OUTPUT>(events, source);
+            process<2, ERROR>(events, source);
+
+            cleanup(events, source, handler_.get());
         }
         events.resize(events.capacity());
     }
 }
 
-/// Wait
-/// @brief
-template <int id, int flags, typename Cache, typename Process>
-void wait(const Handler& base, Cache& cache, const Handler& source, Process& proc) {
-    auto& resource = cache->resources[source.native()];
-    // update next
-    resource.callables[id] = proc;
-    resource.state.next |= flags;
-
-    // check current state
-    if (resource.state.curr != resource.state.next) {
-        // update event triggers
-        epoll_event ev;
-        ev.events  = resource.state.next;
-        ev.data.fd = source.native();
-        if (resource.state.curr)
-            assert(::epoll_ctl(base.native(), EPOLL_CTL_MOD, ev.data.fd, &ev) == 0);
-        else
-            assert(::epoll_ctl(base.native(), EPOLL_CTL_ADD, ev.data.fd, &ev) == 0);
-        // update current
-        resource.state.curr = ev.events;
-    }
+void wait(Input, const Element::Shared& handler, const Space::Pointer& space, Process&& func) {
+    wait<0, INPUT>(handler, space->handler_, func);
 }
-void wait(Input, const Handler& handler, const Space::Shared& space, Process func) {
-    wait<Input::id, INPUT>(space->handler_, space->cache_, handler, func);
+void wait(Output, const Element::Shared& handler, const Space::Pointer& space, Process&& func) {
+    wait<1, OUTPUT>(handler, space->handler_, func);
 }
-void wait(Output, const Handler& handler, const Space::Shared& space, Process func) {
-    wait<Output::id, OUTPUT>(space->handler_, space->cache_, handler, func);
-}
-void wait(Error, const Handler& handler, const Space::Shared& space, Process func) {
-    wait<Error::id, ERROR>(space->handler_, space->cache_, handler, func);
+void wait(Error, const Element::Shared& handler, const Space::Pointer& space, Process&& func) {
+    wait<2, ERROR>(handler, space->handler_, func);
 }
 
 } // namespace fusion
