@@ -5,12 +5,6 @@
 #include "resources/timer.hpp"
 
 
-struct Monitor {
-    Monitor() { std::cout << "build " << this << std::endl; }
-    Monitor(const Monitor&) { std::cout << "copy " << this << std::endl; }
-    Monitor(Monitor&&) { std::cout << "move " << this << std::endl; }
-};
-
 /// Test
 /// @brief
 TEST(resource_timer, positive_test) {
@@ -21,14 +15,13 @@ TEST(resource_timer, positive_test) {
         build<fusion::Timer>(
           self,
           [&life](auto self, auto space) {
-              call(self, [&life](auto self, auto scope) {
-                  wait<fusion::Input>(scope, [&life, callable = self](auto self, auto space) {
+              call(self, [&life](auto self, auto callback) {
+                  wait<fusion::Input>(self, [&life, callback](auto self, auto space) {
                       clear(self);
                       if (life) {
                           ++life;
-                          call(self, callable);
+                          call(self, callback);
                       }
-                      wait<fusion::Continue>(scope);
                   });
               });
 
@@ -36,12 +29,12 @@ TEST(resource_timer, positive_test) {
               build<fusion::Timer>(
                 self,
                 [&life](auto self, auto space) {
-                    call(self, [&life](auto self, auto scope) {
-                        wait<fusion::Input>(scope, [&life, callable = self](auto self, auto space) {
+                    call(self, [&life](auto self, auto callback) {
+                        wait<fusion::Input>(self, [&life, callback](auto self, auto space) {
                             clear(self);
                             if (life) {
                                 --life;
-                                call(self, callable);
+                                call(self, callback);
                             }
                         });
                     });

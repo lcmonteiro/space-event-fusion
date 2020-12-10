@@ -32,13 +32,6 @@ using Error    = basetype<3>;
 using Continue = basetype<0>;
 using Delete   = basetype<-1>;
 
-// base
-using Process = std::function<void()>;
-
-// callback
-template <typename... Args>
-using Callback = std::function<void(Args...)>;
-
 /// extended wainting types
 /// - Connection
 template <typename Type>
@@ -50,14 +43,19 @@ namespace input {
     using Connection = fusion::Connection<Input>;
 }
 
-// exceptions
+/// exceptions
 namespace exception {
-    struct Continue : std::runtime_error {};
+    struct Rollback : std::exception {};
 } // namespace exception
 
-// data types
+/// data
 using Buffer = std::vector<std::byte>;
 using String = std::string;
+
+// - process
+using Process = std::function<void()>;
+template <typename... Args>
+using Callback = std::function<void(Args...)>;
 
 /// ===============================================================================================
 /// Element
@@ -92,9 +90,11 @@ struct Element {
     const std::shared_ptr<Handler> handler_;
 };
 
-
+/// ===============================================================================================
 /// Space
 /// @brief
+///
+/// ===============================================================================================
 struct Space {
     using Pointer = std::shared_ptr<Space>;
     /// constructor
@@ -181,13 +181,6 @@ namespace {
         }
 
         /// wait
-        /// @brief
-        template <typename Callable, typename... Args>
-        friend constexpr void wait(Continue, const Pointer&) {
-            throw exception::Continue();
-        }
-
-        /// wait
         /// @brief recursive method until space fusion
         template <typename Type, typename Handler, typename Callable>
         friend constexpr void
@@ -249,7 +242,7 @@ build(Base base, Callable call, Args&&... args) {
 ///
 /// ===============================================================================================
 template <typename Type, typename Pointer, typename Callable, typename... Args>
-void wait(Pointer&& scope, Callable&& callable, Args&&... args) {
+constexpr void wait(Pointer&& scope, Callable&& callable, Args&&... args) {
     wait(
       Type(),
       std::forward<Pointer>(scope),
@@ -258,11 +251,15 @@ void wait(Pointer&& scope, Callable&& callable, Args&&... args) {
 }
 
 /// ===============================================================================================
-/// Helpers
+/// Call - Interfaces 
 /// @brief
 ///
 /// ===============================================================================================
 template <typename Scope, typename Callable>
-void call(Scope scope, Callable func) {
-    func(func, scope);
+constexpr void call(Scope scope, Callable func) {
+    func(scope, std::move(func));
+}
+template <typename Scope, typename Callable>
+constexpr void call(Scope scope, const std::shared_ptr<Callable>& pfunc) {
+    (*pfunc)(scope, pfunc);
 }

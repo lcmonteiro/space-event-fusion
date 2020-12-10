@@ -158,7 +158,7 @@ static inline void process(const Event& events, Source* source) {
             // execute
             callable();
         }
-        catch (const exception::Continue&) {
+        catch (const exception::Rollback&) {
             // reinsert
             std::get<1>(source->events) |= flags;
             std::get<i>(source->binds) = std::move(callable);

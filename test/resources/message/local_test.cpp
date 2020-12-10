@@ -4,11 +4,10 @@
 
 #include "resources/message/local.hpp"
 
-
 /// Test
 /// @brief
 TEST(resources_message_local, positive_test) {
-    constexpr auto NBYTES = 10000;
+    constexpr auto NBYTES = 1000;
 
     std::string expect(NBYTES, 'i');
 
@@ -22,13 +21,14 @@ TEST(resources_message_local, positive_test) {
               wait<fusion::output::Connection>(
                 self,
                 [&data](auto self, auto space) {
-                    call(self, [&data](auto self, auto scope) {
-                        wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
-                            data.resize(data.capacity());
+                    call(self, [&data](auto self, auto callback) {
+                        wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                            std::string data;
+                            data.resize(NBYTES);
                             read(self, data);
                             write(self, data + "i");
-                            if (data.size() < data.capacity())
-                                call(self, callable);
+                            if (data.size() < NBYTES)
+                                call(self, callback);
                         });
                     });
                 },
@@ -43,14 +43,15 @@ TEST(resources_message_local, positive_test) {
               wait<fusion::output::Connection>(
                 self,
                 [&data](auto self, auto space) {
-                    call(self, [&data](auto self, auto scope) {
-                        wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
-                            data.resize(data.capacity());
-                            read(self, data);
-                            write(self, data + "i");
-                            if (data.size() < data.capacity())
-                                call(self, callable);
-                        });
+                    call(self, [&data](auto self, auto callback) {
+                        wait<fusion::Input>(
+                          self, [&data, callback = callback](auto self, auto space) {
+                              data.resize(NBYTES);
+                              read(self, data);
+                              write(self, data + "i");
+                              if (data.size() < NBYTES)
+                                  call(self, callback);
+                          });
                     });
                     write(self, std::string("i"));
                 },

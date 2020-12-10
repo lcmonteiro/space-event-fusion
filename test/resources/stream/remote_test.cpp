@@ -8,7 +8,7 @@
 /// Test
 /// @brief
 TEST(resources_stream_remote, positive_test) {
-    constexpr auto NBYTES = 100;
+    constexpr auto NBYTES = 1000;
 
     std::string expect(NBYTES, 'c');
     std::transform(
@@ -26,14 +26,14 @@ TEST(resources_stream_remote, positive_test) {
           self,
           [&data](auto self, auto space) {
               wait<fusion::input::Connection>(self, [&data](auto self, auto space) {
-                  call(self, [&data](auto self, auto scope) {
-                      wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
-                          data.resize(data.capacity());
+                  call(self, [&data](auto self, auto callback) {
+                      wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          data.resize(NBYTES);
                           read(self, data);
                           write(self, data + "s");
 
-                          if (data.size() < data.capacity())
-                              call(self, callable);
+                          if (data.size() < NBYTES)
+                              call(self, callback);
                       });
                   });
               });
@@ -45,13 +45,13 @@ TEST(resources_stream_remote, positive_test) {
             wait<fusion::output::Connection>(
               self,
               [&data](auto self, auto space) {
-                  call(self, [&data](auto self, auto scope) {
-                      wait<fusion::Input>(scope, [&data, callable = self](auto self, auto space) {
-                          data.resize(data.capacity());
+                  call(self, [&data](auto self, auto callback) {
+                      wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          data.resize(NBYTES);
                           read(self, data);
                           write(self, data + "c");
-                          if (data.size() < data.capacity())
-                              call(self, callable);
+                          if (data.size() < NBYTES)
+                              call(self, callback);
                       });
                   });
                   write(self, std::string("c"));
