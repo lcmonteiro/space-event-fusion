@@ -4,6 +4,13 @@
 
 #include "resources/timer.hpp"
 
+
+struct Monitor {
+    Monitor() { std::cout << "build " << this << std::endl; }
+    Monitor(const Monitor&) { std::cout << "copy " << this << std::endl; }
+    Monitor(Monitor&&) { std::cout << "move " << this << std::endl; }
+};
+
 /// Test
 /// @brief
 TEST(resource_timer, positive_test) {
@@ -21,6 +28,7 @@ TEST(resource_timer, positive_test) {
                           ++life;
                           call(self, callable);
                       }
+                      wait<fusion::Continue>(scope);
                   });
               });
 

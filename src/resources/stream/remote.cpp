@@ -22,77 +22,70 @@ namespace stream {
         /// =======================================================================================
         /// server
         /// =======================================================================================
-        Server::Server(const Address& local)
-          : Element([&local]() {
-                // bind parameters
-                addrinfo hints;
-                hints.ai_family    = AF_UNSPEC;
-                hints.ai_socktype  = SOCK_STREAM;
-                hints.ai_flags     = AI_PASSIVE;
-                hints.ai_protocol  = 0;
-                hints.ai_canonname = NULL;
-                hints.ai_addr      = NULL;
-                hints.ai_next      = NULL;
+        Server::Server(const Address& local) {
+            // bind parameters
+            addrinfo hints;
+            hints.ai_family    = AF_UNSPEC;
+            hints.ai_socktype  = SOCK_STREAM;
+            hints.ai_flags     = AI_PASSIVE;
+            hints.ai_protocol  = 0;
+            hints.ai_canonname = NULL;
+            hints.ai_addr      = NULL;
+            hints.ai_next      = NULL;
 
-                // get address information
-                addrinfo* result;
-                auto& [host, port] = local;
-                if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
-                    throw std::system_error(
-                      std::make_error_code(std::errc(errno)), "server::getaddrinfo");
+            // get address information
+            addrinfo* result;
+            auto& [host, port] = local;
+            if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
+                throw std::system_error(
+                  std::make_error_code(std::errc(errno)), "server::getaddrinfo");
 
-                // pointer guard
-                std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
+            // pointer guard
+            std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
 
-                // find address
-                for (auto rp = result; rp != NULL; rp = rp->ai_next) {
-                    // create a server handler
-                    auto h = Handler(
-                      ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
+            // find address
+            for (auto rp = result; rp != NULL; rp = rp->ai_next) {
+                // create a server handler
+                native<void>(
+                  ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
 
-                    // set options
-                    int opt = 1;
-                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
-                        continue;
-                    if (::setsockopt(h.native(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) < 0)
-                        continue;
+                // set options
+                int opt = 1;
+                if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
+                    continue;
+                if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) < 0)
+                    continue;
 
-                    // bind address
-                    if (::bind(h.native(), rp->ai_addr, rp->ai_addrlen) < 0)
-                        continue;
+                // bind address
+                if (::bind(native<int>(), rp->ai_addr, rp->ai_addrlen) < 0)
+                    continue;
 
-                    // listen just one connection
-                    if (::listen(h.native(), 1) < 0)
-                        continue;
+                // listen just one connection
+                if (::listen(native<int>(), 1) < 0)
+                    continue;
 
-                    return h;
-                }
-                // fallback
-                throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
-            }()) {}
+                return;
+            }
+            // fallback
+            throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
+        }
 
 
         Process wait(input::Connection, Server& self, Server::Callback callback) {
             // after input waitting
             return [&self, callback = std::move(callback)] {
                 // accept & update handler
-                self.handler_ = Handler(::accept(self.handler_.native(), NULL, NULL));
+                self.native<void>(::accept(self.native<int>(), NULL, NULL));
                 // back to main function
                 callback();
             };
         }
 
-        void read(Server::Shared self, std::string& str) {
-            auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
-            if (count <= 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-            str.resize(count);
-        }
+        void read(Server::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
+        void read(Server::Shared self, String& s) { self->native<void, String&>(s); }
 
-        void write(Server::Shared self, const std::string& str) {
-            if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-        }
+        void write(Server::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
+        void write(Server::Shared self, const String& s) { self->native<void, const String&>(s); }
 
 
         /// =======================================================================================
@@ -124,25 +117,24 @@ namespace stream {
             // find address
             for (auto rp = result; rp != NULL; rp = rp->ai_next) {
                 // create a client handler
-                auto h = Handler(
+                self.native<void>(
                   ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
 
                 // try connect
-                auto res = ::connect(h.native(), rp->ai_addr, rp->ai_addrlen);
+                auto res = ::connect(self.native<int>(), rp->ai_addr, rp->ai_addrlen);
 
                 // check result
                 if (res != 0 && errno != EINPROGRESS)
                     continue;
 
-                // update resource handler
-                self.handler_ = std::move(h);
-
                 // run after input waitting
-                return [native = self.handler_.native(), callback = std::move(callback)] {
+                return [&self, callback = std::move(callback)] {
                     // check connection
                     auto result = int(0);
                     auto length = socklen_t(sizeof(result));
-                    if (getsockopt(native, SOL_SOCKET, SO_ERROR, &result, &length) < 0 || result != 0)
+                    if (
+                      getsockopt(self.native<int>(), SOL_SOCKET, SO_ERROR, &result, &length) < 0
+                      || result != 0)
                         throw std::system_error(std::make_error_code(std::errc::broken_pipe));
 
                     // back to main function
@@ -153,17 +145,13 @@ namespace stream {
             throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
         }
 
-        void read(Client::Shared self, std::string& str) {
-            auto count = ::recv(self->handler_.native(), str.data(), str.size(), 0);
-            if (count <= 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)), "client::read");
-            str.resize(count);
-        }
 
-        void write(Client::Shared self, const std::string& str) {
-            if (::send(self->handler_.native(), str.data(), str.size(), MSG_NOSIGNAL) < 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)), "client::write");
-        }
+        void read(Client::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
+        void read(Client::Shared self, String& s) { self->native<void, String&>(s); }
+
+        void write(Client::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
+        void write(Client::Shared self, const String& s) { self->native<void, const String&>(s); }
+
     } // namespace remote
 } // namespace stream
 } // namespace fusion

@@ -14,7 +14,6 @@ namespace fusion {
 namespace message {
     namespace local {
         using Address = std::string;
-        using Buffer  = std::vector<std::byte>;
 
         /// =======================================================================================
         /// Messenger

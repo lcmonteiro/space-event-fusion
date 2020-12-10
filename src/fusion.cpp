@@ -9,6 +9,7 @@
 #include <error.h>
 #include <sys/epoll.h>
 #include <sys/poll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -20,17 +21,21 @@ namespace fusion {
 
 
 /// ===============================================================================================
-/// Element Handler implementation
+/// Element implementation
+/// - handler
 /// - constructor
+/// - native interface
 /// - desctructor
 /// ===============================================================================================
 struct Element::Handler {
-    int native{-1};
+    int native;
     std::tuple<int, int> events;
     std::tuple<Process, Process, Process> binds;
 };
 
-Element::Element() : handler_{std::make_shared<Handler>()} {}
+Element::Element() : handler_{std::make_shared<Handler>()} {
+    handler_->native = -1;
+}
 
 template <>
 Element::Element(int native) : handler_{std::make_shared<Handler>()} {
@@ -44,8 +49,57 @@ int Element::native() {
     return handler_->native;
 }
 
+/// update native handler
+/// @brief
+/// this method will:
+/// - close the current handler,
+/// - reset the current events
+/// - and save the new handler
+template <>
+void Element::native(int native) {
+    std::get<0>(handler_->events) = 0;
+    if (handler_->native)
+        close(handler_->native);
+    if (native < 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+    handler_->native = native;
+}
+
+/// read native interface
+/// @brief
+/// this method will:
+template <>
+void Element::native(std::string& buf) {
+    auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
+    if (count <= 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+    buf.resize(count);
+}
+template <>
+void Element::native(std::vector<std::byte>& buf) {
+    auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
+    if (count <= 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+    buf.resize(count);
+}
+
+/// write native interface
+/// @brief
+/// this method will:
+template <>
+void Element::native(const std::string& buf) {
+    if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+}
+template <>
+void Element::native(const std::vector<std::byte>& buf) {
+    if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)));
+}
+
 Element::~Element() {
-    close(handler_->native);
+    if (handler_->native)
+        close(handler_->native);
 }
 
 /// ===============================================================================================
@@ -70,22 +124,22 @@ struct Space::Handler {
 template <int i, int flags, typename Source, typename Base, typename Process>
 void wait(const Source& source, const Base& base, Process& proc) {
     // update future
-    std::get<i>(source->binds) = proc;
+    std::get<i>(source->binds) = std::move(proc);
     std::get<1>(source->events) |= flags;
 
     // update state
     if (std::get<0>(source->events) != std::get<1>(source->events)) {
         // update element
-        auto [_, result] = base->cache.emplace(source.get(), source);
+        base->cache.emplace(source.get(), source);
 
         // update events
         epoll_event ev;
         ev.events   = std::get<1>(source->events);
         ev.data.ptr = source.get();
-        if (result)
-            assert(::epoll_ctl(base->native, EPOLL_CTL_ADD, source->native, &ev) == 0);
-        else
+        if (std::get<0>(source->events))
             assert(::epoll_ctl(base->native, EPOLL_CTL_MOD, source->native, &ev) == 0);
+        else
+            assert(::epoll_ctl(base->native, EPOLL_CTL_ADD, source->native, &ev) == 0);
 
         // update current
         std::get<0>(source->events) = ev.events;
@@ -165,7 +219,7 @@ void Space::run() {
         // check error
         if (count < 0)
             throw std::system_error(std::make_error_code(std::errc(errno)));
-        
+
         // process events
         events.resize(count);
         for (auto& ev : events) {

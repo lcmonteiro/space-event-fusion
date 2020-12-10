@@ -26,10 +26,11 @@ struct basetype {
     constexpr static int id = n;
     explicit basetype()     = default;
 };
-using Output = basetype<1>;
-using Input  = basetype<2>;
-using Error  = basetype<3>;
-using Delete = basetype<-1>;
+using Output   = basetype<1>;
+using Input    = basetype<2>;
+using Error    = basetype<3>;
+using Continue = basetype<0>;
+using Delete   = basetype<-1>;
 
 // base
 using Process = std::function<void()>;
@@ -54,49 +55,15 @@ namespace exception {
     struct Continue : std::runtime_error {};
 } // namespace exception
 
+// data types
+using Buffer = std::vector<std::byte>;
+using String = std::string;
 
 /// ===============================================================================================
-/// Resources
+/// Element
 /// @brief
 ///
 /// ===============================================================================================
-// struct Handler {
-//     // deleted
-//     Handler(const Handler&) = delete;
-
-//     // default
-//     Handler() = default;
-
-//     /// constructor
-//     /// @brief
-//     template <typename Native>
-//     Handler(Native id);
-
-//     /// move constructor
-//     /// @brief
-//     Handler(Handler&& h) { std::swap(native_, h.native_); }
-
-//     /// move assign
-//     /// @brief
-//     Handler& operator=(Handler&& h) {
-//         std::swap(native_, h.native_);
-//         return *this;
-//     }
-
-//     /// native
-//     /// @brief
-//     auto native() const { return native_; }
-
-//     /// destructor
-//     /// @brief
-//     ~Handler();
-
-//   private:
-//     int native_{-1};
-// };
-
-/// Element
-/// @brief
 struct Element {
     struct Handler;
     using Shared = std::shared_ptr<Handler>;
@@ -118,7 +85,7 @@ struct Element {
     /// native interface
     /// @brief
     template <typename Result, typename... Args>
-    Result native(Args&&... args);
+    Result native(Args... args);
 
     /// native handler
     /// @brief
@@ -129,7 +96,6 @@ struct Element {
 /// Space
 /// @brief
 struct Space {
-
     using Pointer = std::shared_ptr<Space>;
     /// constructor
     /// @brief
@@ -165,7 +131,7 @@ struct Space {
 namespace {
     template <typename Source, typename Base>
     struct scope : Source {
-        using Shared = std::shared_ptr<scope>;
+        using Pointer = std::shared_ptr<scope>;
 
         /// constructor
         /// @brief
@@ -177,7 +143,7 @@ namespace {
         /// wait
         /// @brief
         template <typename Action, typename Callable, typename... Args>
-        friend constexpr void wait(Action, const Shared& scope, Callable func, Args&&... args) {
+        friend constexpr void wait(Action, const Pointer& scope, Callable func, Args&&... args) {
             wait(
               Action(),
               scope->handler_,
@@ -195,7 +161,7 @@ namespace {
         /// @brief
         template <int n, typename Callable, typename... Args>
         friend constexpr void
-        wait(basetype<n>, const Shared& scope, Callable func, Args&&... args) {
+        wait(basetype<n>, const Pointer& scope, Callable func, Args&&... args) {
             wait(
               basetype<n>(),
               scope->handler_,
@@ -208,31 +174,38 @@ namespace {
         /// wait
         /// @brief
         template <typename Callable, typename... Args>
-        friend constexpr void wait(Delete, const Shared& scope, Callable func, Args&&... args) {
+        friend constexpr void wait(Delete, const Pointer& scope, Callable func) {
             scope->destroy_ = [call = std::move(func), scope, next = scope->base_] {
                 call(scope, next);
             };
         }
 
         /// wait
+        /// @brief
+        template <typename Callable, typename... Args>
+        friend constexpr void wait(Continue, const Pointer&) {
+            throw exception::Continue();
+        }
+
+        /// wait
         /// @brief recursive method until space fusion
-        template <typename Type, typename Handler, typename Process>
+        template <typename Type, typename Handler, typename Callable>
         friend constexpr void
-        wait(Type, const Handler& handler, const Shared& scope, Process&& func) {
-            wait(Type(), handler, scope->base_, std::forward<Process>(func));
+        wait(Type, const Handler& handler, const Pointer& scope, Callable&& func) {
+            wait(Type(), handler, scope->base_, std::forward<Callable>(func));
         }
 
       protected:
         /// scope guard
         /// @brief
         struct Guard {
-            Guard(const Shared& _scope) : scope(_scope) {}
+            Guard(const Pointer& _scope) : scope(_scope) {}
             ~Guard() {
                 if (scope.use_count() == 1)
                     if (scope->delete_)
                         scope->delete_(scope, scope->base_);
             }
-            Shared scope;
+            Pointer scope;
         };
 
       private:
@@ -240,11 +213,11 @@ namespace {
         const Base base_;
 
         // callback before end
-        std::function<void(const Shared&, const Base&)> delete_;
+        std::function<void(const Pointer&, const Base&)> delete_;
     };
     template <typename Source>
     struct scope<Source, void> : Source {
-        using Shared = std::shared_ptr<scope>;
+        using Pointer = std::shared_ptr<scope>;
     };
     template <typename Source, typename Base>
     using Scope = std::shared_ptr<scope<Source, Base>>;
@@ -275,11 +248,11 @@ build(Base base, Callable call, Args&&... args) {
 /// @brief
 ///
 /// ===============================================================================================
-template <typename Type, typename Shared, typename Callable, typename... Args>
-void wait(Shared&& scope, Callable&& callable, Args&&... args) {
+template <typename Type, typename Pointer, typename Callable, typename... Args>
+void wait(Pointer&& scope, Callable&& callable, Args&&... args) {
     wait(
       Type(),
-      std::forward<Shared>(scope),
+      std::forward<Pointer>(scope),
       std::forward<Callable>(callable),
       std::forward<Args>(args)...);
 }

@@ -9,12 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 add_library(event-fusion
 	./src/fusion.cpp
 	./src/resources/timer.cpp
-	#./src/resources/stream/remote.cpp
-	#./src/resources/message/local.cpp
-)
-
-add_executable(fusion-test
-	./test.cpp
+	./src/resources/stream/remote.cpp
+	./src/resources/message/local.cpp
 )
 
 # includes

@@ -24,23 +24,20 @@ namespace message {
         /// - write
         /// =======================================================================================
         Messenger::Messenger(const Address& source)
-          : Element([&source] {
-                struct sockaddr_un addr;
-                std::memset(&addr, 0, sizeof(addr));
-                // create a messanger handler
-                auto handler = Handler(::socket(PF_LOCAL, SOCK_DGRAM | SOCK_NONBLOCK, 0));
-                // bind source
-                addr.sun_family  = PF_LOCAL;
-                addr.sun_path[0] = '\0';
-                std::strncpy(&addr.sun_path[1], source.data(), sizeof(addr.sun_path) - 2);
-                if (::bind(handler.native(), (struct sockaddr*)&addr, sizeof(addr)) < 0)
-                    throw std::system_error(std::make_error_code(std::errc(errno)));
-                return handler;
-            }()) {}
+          : Element{::socket(PF_LOCAL, SOCK_DGRAM | SOCK_NONBLOCK, 0)} {
+            struct sockaddr_un addr;
+            std::memset(&addr, 0, sizeof(addr));
+            // bind source
+            addr.sun_family  = PF_LOCAL;
+            addr.sun_path[0] = '\0';
+            std::strncpy(&addr.sun_path[1], source.data(), sizeof(addr.sun_path) - 2);
+            if (::bind(native<int>(), (struct sockaddr*)&addr, sizeof(addr)) < 0)
+                throw std::system_error(std::make_error_code(std::errc(errno)));
+        }
 
         Process
         wait(output::Connection, Messenger& self, Callback<> callable, const Address& destination) {
-            return [native = self.handler_.native(), callable = std::move(callable), destination] {
+            return [native = self.native<int>(), callable = std::move(callable), destination] {
                 struct sockaddr_un addr;
                 std::memset(&addr, 0, sizeof(addr));
                 // connect to destination
@@ -54,27 +51,12 @@ namespace message {
             };
         }
 
-        void read(Messenger::Shared self, Buffer& buf) {
-            auto count = ::recv(self->handler_.native(), buf.data(), buf.size(), 0);
-            if (count <= 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-            buf.resize(count);
-        }
-        void read(Messenger::Shared self, std::string& buf) {
-            auto count = ::recv(self->handler_.native(), buf.data(), buf.size(), 0);
-            if (count <= 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-            buf.resize(count);
-        }
+        void read(Messenger::Shared s, Buffer& b) { s->native<void, Buffer&>(b); }
+        void read(Messenger::Shared s, String& b) { s->native<void, String&>(b); }
+        
+        void write(Messenger::Shared s, const Buffer& b) { s->native<void, const Buffer&>(b); }
+        void write(Messenger::Shared s, const String& b) { s->native<void, const String&>(b); }
 
-        void write(Messenger::Shared self, const Buffer& buf) {
-            if (::send(self->handler_.native(), buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-        }
-        void write(Messenger::Shared self, const std::string& buf) {
-            if (::send(self->handler_.native(), buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
-                throw std::system_error(std::make_error_code(std::errc(errno)));
-        }
 
     } // namespace local
 } // namespace message

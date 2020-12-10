@@ -8,10 +8,12 @@
 /// Test
 /// @brief
 TEST(resources_message_local, positive_test) {
-    std::string expect(100, 'i');
+    constexpr auto NBYTES = 10000;
+
+    std::string expect(NBYTES, 'i');
 
     // process
-    std::string data(100, '\0');
+    std::string data(NBYTES, '\0');
     build<fusion::Space>([&data](auto self) {
         // ping
         build<fusion::message::local::Messenger>(
@@ -25,7 +27,7 @@ TEST(resources_message_local, positive_test) {
                             data.resize(data.capacity());
                             read(self, data);
                             write(self, data + "i");
-                            if (data.size() < 100)
+                            if (data.size() < data.capacity())
                                 call(self, callable);
                         });
                     });
@@ -46,7 +48,7 @@ TEST(resources_message_local, positive_test) {
                             data.resize(data.capacity());
                             read(self, data);
                             write(self, data + "i");
-                            if (data.size() < 100)
+                            if (data.size() < data.capacity())
                                 call(self, callable);
                         });
                     });

@@ -36,11 +36,13 @@ namespace stream {
 
             /// read
             /// @brief
-            friend void read(Shared self, std::string& str);
+            friend void read(Shared self, String& buf);
+            friend void read(Shared self, Buffer& buf);
 
             /// write
             /// @brief
-            friend void write(Shared self, const std::string& str);
+            friend void write(Shared self, const Buffer& buf);
+            friend void write(Shared self, const String& str);
         };
 
 
@@ -61,11 +63,13 @@ namespace stream {
 
             /// read
             /// @brief
-            friend void read(Shared self, std::string& str);
+            friend void read(Shared self, String& buf);
+            friend void read(Shared self, Buffer& buf);
 
             /// write
             /// @brief
-            friend void write(Shared self, const std::string& str);
+            friend void write(Shared self, const Buffer& buf);
+            friend void write(Shared self, const String& str);
         };
     } // namespace remote
 } // namespace stream
