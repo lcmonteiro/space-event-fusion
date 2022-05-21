@@ -1,24 +1,45 @@
-cmake_minimum_required (VERSION 3.13)
-
+cmake_minimum_required (VERSION 3.16)
+# -------------------------------------------------------------------
 # project
+# -------------------------------------------------------------------
 project(space-event-fusion)
 
-set(CMAKE_CXX_STANDARD 17)
+# options
+OPTION(ENABLE_TESTING  "Enable code testing support"   OFF)
 
-# space target
+# properties
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+
+# -------------------------------------------------------------------
+# entry points
+# -------------------------------------------------------------------
+# space library
 add_library(event-fusion
 	./src/fusion.cpp
 	./src/resources/timer.cpp
 	./src/resources/stream/remote.cpp
 	./src/resources/message/local.cpp
 )
-
-# includes
 target_include_directories(event-fusion
 PUBLIC
 	./include
 )
+# space testing 
+if(ENABLE_TESTING)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
-# test
-enable_testing()
-add_subdirectory(test)
+# -------------------------------------------------------------------
+# summary
+# -------------------------------------------------------------------
+message(STATUS)
+message(STATUS "${PROJECT_NAME} configuration:")
+message(STATUS "  CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
+message(STATUS "  ENABLE_TESTING   = ${ENABLE_TESTING}")
+message(STATUS)
+
+# -------------------------------------------------------------------
+# end
+# -------------------------------------------------------------------
