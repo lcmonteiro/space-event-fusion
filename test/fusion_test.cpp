@@ -13,16 +13,21 @@ TEST(fusion_space, positive_test) {
         build<fusion::stream::remote::Server>(
           self,
           [](auto self, auto space) {
+              std::ignore = space;
               wait<fusion::input::Connection>(self, [](auto self, auto space) {
+                  std::ignore = space;
                   call(self, [](auto self, auto callback) {
                       wait<fusion::Input>(self, [callback](auto self, auto space) {
+                          std::ignore = space;
                           std::string data(100, '\0');
                           read(self, data);
                           std::cout << "rx= " << data << std::endl;
                           build<fusion::Timer>(
                             self,
                             [data](auto self, auto space) {
+                                std::ignore = space;
                                 wait<fusion::Input>(self, [data](auto self, auto space) {
+                                    std::ignore = self;
                                     write(space, data + "s");
                                 });
                             },
@@ -37,18 +42,23 @@ TEST(fusion_space, positive_test) {
 
         // client
         build<fusion::stream::remote::Client>(self, [](auto self, auto space) {
+            std::ignore = space;
             wait<fusion::output::Connection>(
               self,
               [](auto self, auto space) {
+                  std::ignore = space;
                   call(self, [](auto self, auto callback) {
                       wait<fusion::Input>(self, [callback](auto self, auto space) {
+                          std::ignore = space;
                           std::string data(100, '\0');
                           read(self, data);
                           std::cout << "rx= " << data << std::endl;
                           build<fusion::Timer>(
                             self,
                             [data](auto self, auto space) {
+                                std::ignore = space;
                                 wait<fusion::Input>(self, [data](auto self, auto space) {
+                                    std::ignore = self;
                                     write(space, data + "c");
                                 });
                             },

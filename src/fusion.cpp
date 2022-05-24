@@ -69,14 +69,14 @@ void Element::native(int native) {
 /// @brief
 /// this method will:
 template <>
-void Element::native(std::string& buf) {
+void Element::native(String& buf) {
     auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
     if (count <= 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
     buf.resize(count);
 }
 template <>
-void Element::native(std::vector<std::byte>& buf) {
+void Element::native(Buffer& buf) {
     auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
     if (count <= 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
@@ -87,12 +87,12 @@ void Element::native(std::vector<std::byte>& buf) {
 /// @brief
 /// this method will:
 template <>
-void Element::native(const std::string& buf) {
+void Element::native(const String& buf) {
     if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
 }
 template <>
-void Element::native(const std::vector<std::byte>& buf) {
+void Element::native(const Buffer& buf) {
     if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
 }

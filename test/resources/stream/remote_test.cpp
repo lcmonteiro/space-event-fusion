@@ -25,9 +25,12 @@ TEST(resources_stream_remote, positive_test) {
         build<fusion::stream::remote::Server>(
           self,
           [&data](auto self, auto space) {
+              std::ignore = space;
               wait<fusion::input::Connection>(self, [&data](auto self, auto space) {
+                  std::ignore = space;
                   call(self, [&data](auto self, auto callback) {
                       wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          std::ignore = space;
                           data.resize(NBYTES);
                           read(self, data);
                           write(self, data + "s");
@@ -42,11 +45,14 @@ TEST(resources_stream_remote, positive_test) {
 
         // client
         build<fusion::stream::remote::Client>(self, [&data](auto self, auto space) {
+            std::ignore = space;
             wait<fusion::output::Connection>(
               self,
               [&data](auto self, auto space) {
+                  std::ignore = space;
                   call(self, [&data](auto self, auto callback) {
                       wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          std::ignore = space;
                           data.resize(NBYTES);
                           read(self, data);
                           write(self, data + "c");

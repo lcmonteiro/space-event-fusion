@@ -15,8 +15,9 @@ TEST(resource_timer, positive_test) {
         build<fusion::Timer>(
           self,
           [&life](auto self, auto space) {
+              std::ignore = space;
               call(self, [&life](auto self, auto callback) {
-                  wait<fusion::Input>(self, [&life, callback](auto self, auto space) {
+                  wait<fusion::Input>(self, [&life, callback](auto self, auto) {
                       clear(self);
                       if (life) {
                           ++life;
@@ -29,8 +30,10 @@ TEST(resource_timer, positive_test) {
               build<fusion::Timer>(
                 self,
                 [&life](auto self, auto space) {
+                    std::ignore = space;
                     call(self, [&life](auto self, auto callback) {
                         wait<fusion::Input>(self, [&life, callback](auto self, auto space) {
+                            std::ignore = space;
                             clear(self);
                             if (life) {
                                 --life;

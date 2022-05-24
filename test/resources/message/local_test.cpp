@@ -18,11 +18,14 @@ TEST(resources_message_local, positive_test) {
         build<fusion::message::local::Messenger>(
           self,
           [&data](auto self, auto space) {
+              std::ignore = space;
               wait<fusion::output::Connection>(
                 self,
                 [&data](auto self, auto space) {
+                    std::ignore = space;
                     call(self, [&data](auto self, auto callback) {
                         wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                            std::ignore = space;
                             std::string data;
                             data.resize(NBYTES);
                             read(self, data);
@@ -40,12 +43,15 @@ TEST(resources_message_local, positive_test) {
         build<fusion::message::local::Messenger>(
           self,
           [&data](auto self, auto space) {
+              std::ignore = space;
               wait<fusion::output::Connection>(
                 self,
                 [&data](auto self, auto space) {
+                    std::ignore = space;
                     call(self, [&data](auto self, auto callback) {
                         wait<fusion::Input>(
                           self, [&data, callback = callback](auto self, auto space) {
+                              std::ignore = space;
                               data.resize(NBYTES);
                               read(self, data);
                               write(self, data + "i");

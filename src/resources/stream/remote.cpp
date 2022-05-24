@@ -1,6 +1,6 @@
 /// ===============================================================================================
 /// @copyright (c) 2020 LCMonteiro                                      _|           _)
-/// @file remote.cpp                                                    _| |  | (_-<  |   _ \    \. 
+/// @file remote.cpp                                                    _| |  | (_-<  |   _ \    \.
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
 /// @date November 20, 2020
 /// ===============================================================================================
@@ -16,142 +16,133 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-namespace fusion {
-namespace stream {
-    namespace remote {
-        /// =======================================================================================
-        /// server
-        /// =======================================================================================
-        Server::Server(const Address& local) {
-            // bind parameters
-            addrinfo hints;
-            hints.ai_family    = AF_UNSPEC;
-            hints.ai_socktype  = SOCK_STREAM;
-            hints.ai_flags     = AI_PASSIVE;
-            hints.ai_protocol  = 0;
-            hints.ai_canonname = NULL;
-            hints.ai_addr      = NULL;
-            hints.ai_next      = NULL;
+namespace fusion::stream::remote {
 
-            // get address information
-            addrinfo* result;
-            auto& [host, port] = local;
-            if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
-                throw std::system_error(
-                  std::make_error_code(std::errc(errno)), "server::getaddrinfo");
+/// ===============================================================================================
+/// server
+/// ===============================================================================================
+Server::Server(const Address& local) {
+    // bind parameters
+    addrinfo hints;
+    hints.ai_family    = AF_UNSPEC;
+    hints.ai_socktype  = SOCK_STREAM;
+    hints.ai_flags     = AI_PASSIVE;
+    hints.ai_protocol  = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr      = NULL;
+    hints.ai_next      = NULL;
 
-            // pointer guard
-            std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
+    // get address information
+    addrinfo* result;
+    auto& [host, port] = local;
+    if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)), "server::getaddrinfo");
 
-            // find address
-            for (auto rp = result; rp != NULL; rp = rp->ai_next) {
-                // create a server handler
-                native<void>(
-                  ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
+    // pointer guard
+    std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
 
-                // set options
-                int opt = 1;
-                if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
-                    continue;
-                if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) < 0)
-                    continue;
+    // find address
+    for (auto rp = result; rp != NULL; rp = rp->ai_next) {
+        // create a server handler
+        native<void>(::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
 
-                // bind address
-                if (::bind(native<int>(), rp->ai_addr, rp->ai_addrlen) < 0)
-                    continue;
+        // set options
+        int opt = 1;
+        if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0)
+            continue;
+        if (::setsockopt(native<int>(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) < 0)
+            continue;
 
-                // listen just one connection
-                if (::listen(native<int>(), 1) < 0)
-                    continue;
+        // bind address
+        if (::bind(native<int>(), rp->ai_addr, rp->ai_addrlen) < 0)
+            continue;
 
-                return;
-            }
-            // fallback
-            throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
-        }
+        // listen just one connection
+        if (::listen(native<int>(), 1) < 0)
+            continue;
 
+        return;
+    }
+    // fallback
+    throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
+}
 
-        Process wait(input::Connection, Server& self, Server::Callback callback) {
-            // after input waitting
-            return [&self, callback = std::move(callback)] {
-                // accept & update handler
-                self.native<void>(::accept(self.native<int>(), NULL, NULL));
-                // back to main function
-                callback();
-            };
-        }
+Process build(input::Connection, Server& self, Process callback) {
+    // after input waitting
+    return [&self, callback = std::move(callback)] {
+        // accept & update handler
+        self.native<void>(::accept(self.native<int>(), NULL, NULL));
+        // back to main function
+        callback();
+    };
+}
 
-        void read(Server::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
-        void read(Server::Shared self, String& s) { self->native<void, String&>(s); }
+void read(Server::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
+void read(Server::Shared self, String& s) { self->native<void, String&>(s); }
 
-        void write(Server::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
-        void write(Server::Shared self, const String& s) { self->native<void, const String&>(s); }
+void write(Server::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
+void write(Server::Shared self, const String& s) { self->native<void, const String&>(s); }
 
 
-        /// =======================================================================================
-        /// client
-        /// =======================================================================================
-        Process
-        wait(output::Connection, Client& self, Client::Callback callback, const Address& remote) {
-            auto& [host, port] = remote;
+/// ===============================================================================================
+/// client
+/// ===============================================================================================
+Process build(output::Connection, Client& self, Process callback, const Address& remote) {
+    auto& [host, port] = remote;
 
-            // bind parameters
-            addrinfo hints;
-            hints.ai_family    = AF_UNSPEC;
-            hints.ai_socktype  = SOCK_STREAM;
-            hints.ai_flags     = AI_PASSIVE;
-            hints.ai_protocol  = 0;
-            hints.ai_canonname = NULL;
-            hints.ai_addr      = NULL;
-            hints.ai_next      = NULL;
+    // bind parameters
+    addrinfo hints;
+    hints.ai_family    = AF_UNSPEC;
+    hints.ai_socktype  = SOCK_STREAM;
+    hints.ai_flags     = AI_PASSIVE;
+    hints.ai_protocol  = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr      = NULL;
+    hints.ai_next      = NULL;
 
-            // address information
-            addrinfo* result;
-            if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
-                throw std::system_error(
-                  std::make_error_code(std::errc(errno)), "client::getaddrinfo");
+    // address information
+    addrinfo* result;
+    if (::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result) != 0)
+        throw std::system_error(std::make_error_code(std::errc(errno)), "client::getaddrinfo");
 
-            // pointer guard
-            std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
+    // pointer guard
+    std::unique_ptr<addrinfo, void (*)(addrinfo*)> guard(result, freeaddrinfo);
 
-            // find address
-            for (auto rp = result; rp != NULL; rp = rp->ai_next) {
-                // create a client handler
-                self.native<void>(
-                  ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
+    // find address
+    for (auto rp = result; rp != NULL; rp = rp->ai_next) {
+        // create a client handler
+        self.native<void>(
+          ::socket(rp->ai_family, rp->ai_socktype | SOCK_NONBLOCK, rp->ai_protocol));
 
-                // try connect
-                auto res = ::connect(self.native<int>(), rp->ai_addr, rp->ai_addrlen);
+        // try connect
+        auto res = ::connect(self.native<int>(), rp->ai_addr, rp->ai_addrlen);
 
-                // check result
-                if (res != 0 && errno != EINPROGRESS)
-                    continue;
+        // check result
+        if (res != 0 && errno != EINPROGRESS)
+            continue;
 
-                // run after input waitting
-                return [&self, callback = std::move(callback)] {
-                    // check connection
-                    auto result = int(0);
-                    auto length = socklen_t(sizeof(result));
-                    if (
-                      getsockopt(self.native<int>(), SOL_SOCKET, SO_ERROR, &result, &length) < 0
-                      || result != 0)
-                        throw std::system_error(std::make_error_code(std::errc::broken_pipe));
+        // run after input waitting
+        return [&self, callback = std::move(callback)] {
+            // check connection
+            auto result = int(0);
+            auto length = socklen_t(sizeof(result));
+            if (
+              getsockopt(self.native<int>(), SOL_SOCKET, SO_ERROR, &result, &length) < 0
+              || result != 0)
+                throw std::system_error(std::make_error_code(std::errc::broken_pipe));
 
-                    // back to main function
-                    callback();
-                };
-            }
-            // fallback
-            throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
-        }
+            // back to main function
+            callback();
+        };
+    }
+    // fallback
+    throw std::system_error(std::make_error_code(std::errc::no_such_device_or_address));
+}
 
+void read(Client::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
+void read(Client::Shared self, String& s) { self->native<void, String&>(s); }
 
-        void read(Client::Shared self, Buffer& b) { self->native<void, Buffer&>(b); }
-        void read(Client::Shared self, String& s) { self->native<void, String&>(s); }
+void write(Client::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
+void write(Client::Shared self, const String& s) { self->native<void, const String&>(s); }
 
-        void write(Client::Shared self, const Buffer& b) { self->native<void, const Buffer&>(b); }
-        void write(Client::Shared self, const String& s) { self->native<void, const String&>(s); }
-
-    } // namespace remote
-} // namespace stream
-} // namespace fusion
+} // namespace fusion::stream::remote

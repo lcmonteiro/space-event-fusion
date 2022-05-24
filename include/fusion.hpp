@@ -21,9 +21,9 @@ namespace fusion {
 /// ===============================================================================================
 /// waiting base types
 /// @brief
-template <int n>
+template <int T>
 struct basetype {
-    constexpr static int id = n;
+    constexpr static int id = T;
     explicit basetype()     = default;
 };
 using Output   = basetype<1>;
@@ -35,7 +35,9 @@ using Delete   = basetype<-1>;
 /// extended wainting types
 /// - Connection
 template <typename Type>
-struct Connection : Type {};
+struct Connection : Type {
+    using Type::Type;
+};
 namespace output {
     using Connection = fusion::Connection<Output>;
 }
@@ -52,10 +54,8 @@ namespace exception {
 using Buffer = std::vector<std::byte>;
 using String = std::string;
 
-// - process
+// process
 using Process = std::function<void()>;
-template <typename... Args>
-using Callback = std::function<void(Args...)>;
 
 /// ===============================================================================================
 /// Element
@@ -142,38 +142,37 @@ namespace {
       protected:
         /// wait
         /// @brief
-        template <typename Action, typename Callable, typename... Args>
-        friend constexpr void wait(Action, const Pointer& scope, Callable func, Args&&... args) {
+        template <typename Type, typename Callable, typename... Args>
+        friend constexpr void wait(Type, const Pointer& scope, Callable func, Args&&... args) {
             wait(
-              Action(),
+              Type{},
               scope->handler_,
               scope->base_,
-              wait(
-                Action(),
+              build(
+                Type{},
                 *scope,
-                [call = std::move(func), guard = Guard(scope), next = scope->base_](auto... args) {
-                    call(guard.scope, next, std::move(args)...);
+                [call = std::move(func), guard = Guard(scope)](auto... args) {
+                    call(guard.scope, guard.scope->base_, std::move(args)...);
                 },
                 std::forward<Args>(args)...));
         }
 
         /// wait
         /// @brief
-        template <int n, typename Callable, typename... Args>
-        friend constexpr void
-        wait(basetype<n>, const Pointer& scope, Callable func, Args&&... args) {
+        template <int T, typename Callable>
+        friend constexpr void wait(basetype<T>, const Pointer& scope, Callable func) {
             wait(
-              basetype<n>(),
+              basetype<T>{},
               scope->handler_,
               scope->base_,
-              [call = std::move(func), guard = Guard(scope), next = scope->base_] {
-                  call(guard.scope, next);
+              [call = std::move(func), guard = Guard(scope)] {
+                  call(guard.scope, guard.scope->base_);
               });
         }
 
         /// wait
         /// @brief
-        template <typename Callable, typename... Args>
+        template <typename Callable>
         friend constexpr void wait(Delete, const Pointer& scope, Callable func) {
             scope->destroy_ = [call = std::move(func), scope, next = scope->base_] {
                 call(scope, next);
@@ -185,20 +184,20 @@ namespace {
         template <typename Type, typename Handler, typename Callable>
         friend constexpr void
         wait(Type, const Handler& handler, const Pointer& scope, Callable&& func) {
-            wait(Type(), handler, scope->base_, std::forward<Callable>(func));
+            wait(Type{}, handler, scope->base_, std::forward<Callable>(func));
         }
 
       protected:
         /// scope guard
         /// @brief
         struct Guard {
-            Guard(const Pointer& _scope) : scope(_scope) {}
+            Guard(const Pointer& s) : scope{s} {}
             ~Guard() {
                 if (scope.use_count() == 1)
                     if (scope->delete_)
                         scope->delete_(scope, scope->base_);
             }
-            Pointer scope;
+            const Pointer scope;
         };
 
       private:
@@ -241,17 +240,17 @@ build(Base base, Callable call, Args&&... args) {
 /// @brief
 ///
 /// ===============================================================================================
-template <typename Type, typename Pointer, typename Callable, typename... Args>
-constexpr void wait(Pointer&& scope, Callable&& callable, Args&&... args) {
+template <typename Type, typename Scope, typename Callable, typename... Args>
+constexpr void wait(Scope&& scope, Callable&& callable, Args&&... args) {
     wait(
-      Type(),
-      std::forward<Pointer>(scope),
+      Type{},
+      std::forward<Scope>(scope),
       std::forward<Callable>(callable),
       std::forward<Args>(args)...);
 }
 
 /// ===============================================================================================
-/// Call - Interfaces 
+/// Call - Interfaces
 /// @brief
 ///
 /// ===============================================================================================

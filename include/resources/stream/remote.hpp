@@ -1,6 +1,6 @@
 /// ===============================================================================================
 /// @copyright (c) 2020 LCMonteiro                                      _|           _)
-/// @file remote.hpp                                                    _| |  | (_-<  |   _ \    \. 
+/// @file remote.hpp                                                    _| |  | (_-<  |   _ \    \.
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
 /// @date November 20, 2020
 /// ===============================================================================================
@@ -11,68 +11,61 @@
 
 #include "fusion.hpp"
 
-namespace fusion {
-namespace stream {
-    namespace remote {
-        using Address = std::tuple<std::string, std::uint16_t>;
+namespace fusion::stream::remote {
 
-        /// =======================================================================================
-        /// server
-        /// @brief
-        /// =======================================================================================
-        class Server : public Element {
-          public:
-            using Shared   = std::shared_ptr<Server>;
-            using Callback = std::function<void()>;
+using Address = std::tuple<std::string, std::uint16_t>;
 
-            /// constructor
-            /// @param local address
-            Server(const Address& local);
+/// =======================================================================================
+/// server
+/// @brief
+/// =======================================================================================
+class Server : public Element {
+  public:
+    using Shared = std::shared_ptr<Server>;
 
-          protected:
-            /// wait connection
-            /// @brief
-            friend Process wait(input::Connection, Server&, Callback);
+    /// constructor
+    /// @param local address
+    Server(const Address& local);
 
-            /// read
-            /// @brief
-            friend void read(Shared self, String& buf);
-            friend void read(Shared self, Buffer& buf);
+  protected:
+    /// build connection process
+    /// @brief
+    friend Process build(input::Connection, Server&, Process);
 
-            /// write
-            /// @brief
-            friend void write(Shared self, const Buffer& buf);
-            friend void write(Shared self, const String& str);
-        };
+    /// read
+    /// @brief
+    friend void read(Shared self, String& buf);
+    friend void read(Shared self, Buffer& buf);
+
+    /// write
+    /// @brief
+    friend void write(Shared self, const Buffer& buf);
+    friend void write(Shared self, const String& str);
+};
 
 
-        /// =======================================================================================
-        /// Client
-        /// @brief
-        /// =======================================================================================
-        class Client : public Element {
-          public:
-            using Shared   = std::shared_ptr<Client>;
-            using Callback = std::function<void()>;
+/// =======================================================================================
+/// Client
+/// @brief
+/// =======================================================================================
+class Client : public Element {
+  public:
+    using Shared = std::shared_ptr<Client>;
 
-          protected:
-            /// wait connection
-            /// @brief
-            /// @param remote address
-            friend Process wait(output::Connection, Client&, Callback, const Address& remote);
+  protected:
+    /// build connection process
+    /// @brief
+    /// @param remote address
+    friend Process build(output::Connection, Client&, Process, const Address& remote);
 
-            /// read
-            /// @brief
-            friend void read(Shared self, String& buf);
-            friend void read(Shared self, Buffer& buf);
+    /// read
+    /// @brief
+    friend void read(Shared self, String& buf);
+    friend void read(Shared self, Buffer& buf);
 
-            /// write
-            /// @brief
-            friend void write(Shared self, const Buffer& buf);
-            friend void write(Shared self, const String& str);
-        };
-    } // namespace remote
-} // namespace stream
-} // namespace fusion
-/// ===============================================================================================
-/// ===============================================================================================
+    /// write
+    /// @brief
+    friend void write(Shared self, const Buffer& buf);
+    friend void write(Shared self, const String& str);
+};
+} // namespace fusion::stream::remote

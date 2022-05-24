@@ -1,6 +1,6 @@
 /// ===============================================================================================
 /// @copyright (c) 2020 LCMonteiro                                      _|           _)
-/// @file local.hpp                                                     _| |  | (_-<  |   _ \    \. 
+/// @file local.hpp                                                     _| |  | (_-<  |   _ \    \.
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
 /// @date November 20, 2020
 /// ===============================================================================================
@@ -10,41 +10,37 @@
 
 #include "fusion.hpp"
 
-namespace fusion {
-namespace message {
-    namespace local {
-        using Address = std::string;
+namespace fusion::message::local {
 
-        /// =======================================================================================
-        /// Messenger
-        /// @brief
-        /// =======================================================================================
-        class Messenger : public Element {
-          public:
-            using Shared = std::shared_ptr<Messenger>;
+using Address = std::string;
 
-            /// constructor
-            /// @param local address
-            Messenger(const Address& source);
+/// =======================================================================================
+/// Messenger
+/// @brief
+/// =======================================================================================
+class Messenger : public Element {
+  public:
+    using Shared = std::shared_ptr<Messenger>;
 
-          protected:
-            /// wait connection
-            /// @brief
-            /// @param remote address
-            friend Process
-            wait(output::Connection, Messenger&, Callback<>, const Address& destination);
+    /// constructor
+    /// @param local address
+    Messenger(const Address& source);
 
-            /// read
-            /// @brief
-            friend void read(Shared self, Buffer& buf);
-            friend void read(Shared self, std::string& buf);
+  protected:
+    /// build connection process
+    /// @brief
+    /// @param remote address
+    friend Process build(output::Connection, Messenger&, Process, const Address& destination);
 
-            /// write
-            /// @brief
-            friend void write(Shared self, const Buffer& buf);
-            friend void write(Shared self, const std::string& buf);
-        };
+    /// read
+    /// @brief
+    friend void read(Shared self, Buffer& buf);
+    friend void read(Shared self, std::string& buf);
 
-    } // namespace local
-} // namespace message
-} // namespace fusion
+    /// write
+    /// @brief
+    friend void write(Shared self, const Buffer& buf);
+    friend void write(Shared self, const std::string& buf);
+};
+
+} // namespace fusion::message::local
