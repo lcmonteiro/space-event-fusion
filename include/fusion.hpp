@@ -236,9 +236,23 @@ build(Base base, Callable call, Args&&... args) {
 }
 
 /// ===============================================================================================
-/// Wait - Interfaces
+/// Call - Interfaces
 /// @brief
 ///
+/// ===============================================================================================
+template <typename Scope, typename Callable>
+constexpr void call(Scope scope, const std::shared_ptr<Callable>& pfunc) {
+    (*pfunc)(scope, pfunc);
+}
+template <typename Scope, typename Callable>
+constexpr void call(Scope scope, Callable func) {
+    call(std::move(scope), std::make_shared<Callable>(std::move(func)));
+}
+
+/// ===============================================================================================
+/// Wait - Interfaces
+/// @brief
+/// these interfaces are responsible for connecting a callback to an event type
 /// ===============================================================================================
 template <typename Type, typename Scope, typename Callable, typename... Args>
 constexpr void wait(Scope&& scope, Callable&& callable, Args&&... args) {
@@ -249,16 +263,12 @@ constexpr void wait(Scope&& scope, Callable&& callable, Args&&... args) {
       std::forward<Args>(args)...);
 }
 
-/// ===============================================================================================
-/// Call - Interfaces
-/// @brief
-///
-/// ===============================================================================================
-template <typename Scope, typename Callable>
-constexpr void call(Scope scope, Callable func) {
-    func(scope, std::move(func));
-}
-template <typename Scope, typename Callable>
-constexpr void call(Scope scope, const std::shared_ptr<Callable>& pfunc) {
-    (*pfunc)(scope, pfunc);
+template <typename Type, typename Scope, typename Callable>
+constexpr void wait_loop(Scope&& scope, Callable&& callable) {
+    call(scope, [callable = std::move(callable)](auto scope, auto callback) {
+        wait(Type{}, scope, [callback = std::move(callback), &callable](auto scope, auto space) {
+            if (callable(scope, std::move(space)))
+                call(scope, callback);
+        });
+    });
 }

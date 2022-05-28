@@ -28,16 +28,12 @@ TEST(resources_stream_remote, positive_test) {
               std::ignore = space;
               wait<fusion::input::Connection>(self, [&data](auto self, auto space) {
                   std::ignore = space;
-                  call(self, [&data](auto self, auto callback) {
-                      wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
-                          std::ignore = space;
-                          data.resize(NBYTES);
-                          read(self, data);
-                          write(self, data + "s");
-
-                          if (data.size() < NBYTES)
-                              call(self, callback);
-                      });
+                  wait_loop<fusion::Input>(self, [&data](auto self, auto space) {
+                      std::ignore = space;
+                      data.resize(NBYTES);
+                      read(self, data);
+                      write(self, data + "s");
+                      return (data.size() < NBYTES);
                   });
               });
           },
@@ -50,15 +46,12 @@ TEST(resources_stream_remote, positive_test) {
               self,
               [&data](auto self, auto space) {
                   std::ignore = space;
-                  call(self, [&data](auto self, auto callback) {
-                      wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
-                          std::ignore = space;
-                          data.resize(NBYTES);
-                          read(self, data);
-                          write(self, data + "c");
-                          if (data.size() < NBYTES)
-                              call(self, callback);
-                      });
+                  wait_loop<fusion::Input>(self, [&data](auto self, auto space) {
+                      std::ignore = space;
+                      data.resize(NBYTES);
+                      read(self, data);
+                      write(self, data + "c");
+                      return (data.size() < NBYTES);
                   });
                   write(self, std::string("c"));
               },

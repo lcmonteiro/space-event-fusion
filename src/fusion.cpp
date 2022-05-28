@@ -28,7 +28,7 @@ namespace fusion {
 /// - desctructor
 /// ===============================================================================================
 struct Element::Handler {
-    int native;
+    int native{-1};
     std::tuple<int, int> events;
     std::tuple<Process, Process, Process> binds;
 };
@@ -223,7 +223,7 @@ void Space::run() {
         // process events
         events.resize(count);
         for (auto& ev : events) {
-            auto source = reinterpret_cast<Element::Handler*>(ev.data.ptr);
+            auto source = static_cast<Element::Handler*>(ev.data.ptr);
             auto events = ev.events;
 
             process<0, INPUT>(events, source);

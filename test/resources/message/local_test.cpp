@@ -1,3 +1,9 @@
+/// ===============================================================================================
+/// @copyright (c) 2020 LCMonteiro                                      _|           _)            
+/// @file local_test.cpp                                                _| |  | (_-<  |   _ \    \. 
+/// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
+/// @date November 20, 2020        
+/// ===============================================================================================
 #include <chrono>
 
 #include <gtest/gtest.h>
@@ -23,16 +29,13 @@ TEST(resources_message_local, positive_test) {
                 self,
                 [&data](auto self, auto space) {
                     std::ignore = space;
-                    call(self, [&data](auto self, auto callback) {
-                        wait<fusion::Input>(self, [&data, callback](auto self, auto space) {
-                            std::ignore = space;
-                            std::string data;
-                            data.resize(NBYTES);
-                            read(self, data);
-                            write(self, data + "i");
-                            if (data.size() < NBYTES)
-                                call(self, callback);
-                        });
+                    wait_loop<fusion::Input>(self, [&data](auto self, auto space) {
+                        std::ignore = space;
+                        std::string data;
+                        data.resize(NBYTES);
+                        read(self, data);
+                        write(self, data + "i");
+                        return (data.size() < NBYTES);
                     });
                 },
                 fusion::message::local::Address{"bbbb"});
@@ -48,16 +51,12 @@ TEST(resources_message_local, positive_test) {
                 self,
                 [&data](auto self, auto space) {
                     std::ignore = space;
-                    call(self, [&data](auto self, auto callback) {
-                        wait<fusion::Input>(
-                          self, [&data, callback = callback](auto self, auto space) {
-                              std::ignore = space;
-                              data.resize(NBYTES);
-                              read(self, data);
-                              write(self, data + "i");
-                              if (data.size() < NBYTES)
-                                  call(self, callback);
-                          });
+                    wait_loop<fusion::Input>(self, [&data](auto self, auto space) {
+                        std::ignore = space;
+                        data.resize(NBYTES);
+                        read(self, data);
+                        write(self, data + "i");
+                        return (data.size() < NBYTES);
                     });
                     write(self, std::string("i"));
                 },

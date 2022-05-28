@@ -16,25 +16,22 @@ TEST(fusion_space, positive_test) {
               std::ignore = space;
               wait<fusion::input::Connection>(self, [](auto self, auto space) {
                   std::ignore = space;
-                  call(self, [](auto self, auto callback) {
-                      wait<fusion::Input>(self, [callback](auto self, auto space) {
-                          std::ignore = space;
-                          std::string data(100, '\0');
-                          read(self, data);
-                          std::cout << "rx= " << data << std::endl;
-                          build<fusion::Timer>(
-                            self,
-                            [data](auto self, auto space) {
-                                std::ignore = space;
-                                wait<fusion::Input>(self, [data](auto self, auto space) {
-                                    std::ignore = self;
-                                    write(space, data + "s");
-                                });
-                            },
-                            std::chrono::system_clock::now() + std::chrono::milliseconds{10});
-                          if (data.size() < data.capacity())
-                              call(self, callback);
-                      });
+                  wait_loop<fusion::Input>(self, [](auto self, auto space) {
+                      std::ignore = space;
+                      std::string data(100, '\0');
+                      read(self, data);
+                      std::cout << "rx= " << data << std::endl;
+                      build<fusion::Timer>(
+                        self,
+                        [data](auto self, auto space) {
+                            std::ignore = space;
+                            wait<fusion::Input>(self, [data](auto self, auto space) {
+                                std::ignore = self;
+                                write(space, data + "s");
+                            });
+                        },
+                        std::chrono::system_clock::now() + std::chrono::milliseconds{10});
+                      return (data.size() < data.capacity());
                   });
               });
           },
@@ -47,25 +44,22 @@ TEST(fusion_space, positive_test) {
               self,
               [](auto self, auto space) {
                   std::ignore = space;
-                  call(self, [](auto self, auto callback) {
-                      wait<fusion::Input>(self, [callback](auto self, auto space) {
-                          std::ignore = space;
-                          std::string data(100, '\0');
-                          read(self, data);
-                          std::cout << "rx= " << data << std::endl;
-                          build<fusion::Timer>(
-                            self,
-                            [data](auto self, auto space) {
-                                std::ignore = space;
-                                wait<fusion::Input>(self, [data](auto self, auto space) {
-                                    std::ignore = self;
-                                    write(space, data + "c");
-                                });
-                            },
-                            std::chrono::system_clock::now() + std::chrono::milliseconds{20});
-                          if (data.size() < data.capacity())
-                              call(self, callback);
-                      });
+                  wait_loop<fusion::Input>(self, [](auto self, auto space) {
+                      std::ignore = space;
+                      std::string data(100, '\0');
+                      read(self, data);
+                      std::cout << "rx= " << data << std::endl;
+                      build<fusion::Timer>(
+                        self,
+                        [data](auto self, auto space) {
+                            std::ignore = space;
+                            wait<fusion::Input>(self, [data](auto self, auto space) {
+                                std::ignore = self;
+                                write(space, data + "c");
+                            });
+                        },
+                        std::chrono::system_clock::now() + std::chrono::milliseconds{20});
+                      return (data.size() < data.capacity());
                   });
                   write(self, std::string("c"));
               },

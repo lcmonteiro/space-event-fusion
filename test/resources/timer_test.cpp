@@ -16,30 +16,20 @@ TEST(resource_timer, positive_test) {
           self,
           [&life](auto self, auto space) {
               std::ignore = space;
-              call(self, [&life](auto self, auto callback) {
-                  wait<fusion::Input>(self, [&life, callback](auto self, auto) {
-                      clear(self);
-                      if (life) {
-                          ++life;
-                          call(self, callback);
-                      }
-                  });
+              wait_loop<fusion::Input>(self, [&life](auto self, auto space) {
+                  std::ignore = space;
+                  clear(self);
+                  return life?++life:0;
               });
-
               // top timer
               build<fusion::Timer>(
                 self,
                 [&life](auto self, auto space) {
                     std::ignore = space;
-                    call(self, [&life](auto self, auto callback) {
-                        wait<fusion::Input>(self, [&life, callback](auto self, auto space) {
-                            std::ignore = space;
-                            clear(self);
-                            if (life) {
-                                --life;
-                                call(self, callback);
-                            }
-                        });
+                    wait_loop<fusion::Input>(self, [&life](auto self, auto space) {
+                        std::ignore = space;
+                        clear(self);
+                        return life?--life:0;
                     });
                 },
                 std::chrono::system_clock::now() + std::chrono::milliseconds{300},
