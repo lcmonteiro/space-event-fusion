@@ -14,6 +14,13 @@
 namespace fusion::stream::remote {
 
 using Address = std::tuple<std::string, std::uint16_t>;
+        /// =======================================================================================
+        /// server
+        /// @brief
+        /// =======================================================================================
+        class Server : public Element {
+          public:
+            using Shared   = std::shared_ptr<Server>;
 
 /// =======================================================================================
 /// server
@@ -26,6 +33,10 @@ class Server : public Element {
     /// constructor
     /// @param local address
     Server(const Address& local);
+          protected:
+            /// decorate with connection process 
+            /// @brief
+            friend Process decorate(input::Connection, Process&&, Server&);
 
   protected:
     /// build connection process
@@ -51,6 +62,26 @@ class Server : public Element {
 class Client : public Element {
   public:
     using Shared = std::shared_ptr<Client>;
+            /// write
+            /// @brief
+            friend void write(Shared self, const Buffer& buf);
+            friend void write(Shared self, const String& str);
+        };
+        
+
+        /// =======================================================================================
+        /// Client
+        /// @brief
+        /// =======================================================================================
+        class Client : public Element {
+          public:
+            using Shared   = std::shared_ptr<Client>;
+
+          protected:
+            /// wait connection
+            /// @brief
+            /// @param remote address
+            friend Process decorate(output::Connection, Process&&, Client&, const Address& remote);
 
   protected:
     /// build connection process

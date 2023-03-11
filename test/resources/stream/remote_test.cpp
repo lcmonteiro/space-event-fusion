@@ -34,6 +34,16 @@ TEST(resources_stream_remote, positive_test) {
                       read(self, data);
                       write(self, data + "s");
                       return (data.size() < NBYTES);
+              await<fusion::input::Connection>(self, [&data](auto self, auto space) {
+                  call(self, [&data](auto self, auto callback) {
+                      await<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          data.resize(NBYTES);
+                          read(self, data);
+                          write(self, data + "s");
+
+                          if (data.size() < NBYTES)
+                              call(self, callback);
+                      });
                   });
               });
           },
@@ -52,6 +62,17 @@ TEST(resources_stream_remote, positive_test) {
                       read(self, data);
                       write(self, data + "c");
                       return (data.size() < NBYTES);
+            await<fusion::output::Connection>(
+              self,
+              [&data](auto self, auto space) {
+                  call(self, [&data](auto self, auto callback) {
+                      await<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                          data.resize(NBYTES);
+                          read(self, data);
+                          write(self, data + "c");
+                          if (data.size() < NBYTES)
+                              call(self, callback);
+                      });
                   });
                   write(self, std::string("c"));
               },

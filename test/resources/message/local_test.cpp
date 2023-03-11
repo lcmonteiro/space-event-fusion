@@ -36,6 +36,18 @@ TEST(resources_message_local, positive_test) {
                         read(self, data);
                         write(self, data + "i");
                         return (data.size() < NBYTES);
+              await<fusion::output::Connection>(
+                self,
+                [&data](auto self, auto space) {
+                    call(self, [&data](auto self, auto callback) {
+                        await<fusion::Input>(self, [&data, callback](auto self, auto space) {
+                            std::string data;
+                            data.resize(NBYTES);
+                            read(self, data);
+                            write(self, data + "i");
+                            if (data.size() < NBYTES)
+                                call(self, callback);
+                        });
                     });
                 },
                 fusion::message::local::Address{"bbbb"});
@@ -57,6 +69,18 @@ TEST(resources_message_local, positive_test) {
                         read(self, data);
                         write(self, data + "i");
                         return (data.size() < NBYTES);
+              await<fusion::output::Connection>(
+                self,
+                [&data](auto self, auto space) {
+                    call(self, [&data](auto self, auto callback) {
+                        await<fusion::Input>(
+                          self, [&data, callback = callback](auto self, auto space) {
+                              data.resize(NBYTES);
+                              read(self, data);
+                              write(self, data + "i");
+                              if (data.size() < NBYTES)
+                                  call(self, callback);
+                          });
                     });
                     write(self, std::string("i"));
                 },

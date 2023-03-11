@@ -32,6 +32,23 @@ TEST(fusion_space, positive_test) {
                         },
                         std::chrono::system_clock::now() + std::chrono::milliseconds{10});
                       return (data.size() < data.capacity());
+              await<fusion::input::Connection>(self, [](auto self, auto space) {
+                  call(self, [](auto self, auto callback) {
+                      await<fusion::Input>(self, [callback](auto self, auto space) {
+                          std::string data(100, '\0');
+                          read(self, data);
+                          std::cout << "rx= " << data << std::endl;
+                          build<fusion::Timer>(
+                            self,
+                            [data](auto self, auto space) {
+                                await<fusion::Input>(self, [data](auto self, auto space) {
+                                    write(space, data + "s");
+                                });
+                            },
+                            std::chrono::system_clock::now() + std::chrono::milliseconds{10});
+                          if (data.size() < data.capacity())
+                              call(self, callback);
+                      });
                   });
               });
           },
@@ -60,6 +77,25 @@ TEST(fusion_space, positive_test) {
                         },
                         std::chrono::system_clock::now() + std::chrono::milliseconds{20});
                       return (data.size() < data.capacity());
+            await<fusion::output::Connection>(
+              self,
+              [](auto self, auto space) {
+                  call(self, [](auto self, auto callback) {
+                      await<fusion::Input>(self, [callback](auto self, auto space) {
+                          std::string data(100, '\0');
+                          read(self, data);
+                          std::cout << "rx= " << data << std::endl;
+                          build<fusion::Timer>(
+                            self,
+                            [data](auto self, auto space) {
+                                await<fusion::Input>(self, [data](auto self, auto space) {
+                                    write(space, data + "c");
+                                });
+                            },
+                            std::chrono::system_clock::now() + std::chrono::milliseconds{20});
+                          if (data.size() < data.capacity())
+                              call(self, callback);
+                      });
                   });
                   write(self, std::string("c"));
               },

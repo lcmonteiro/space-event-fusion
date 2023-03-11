@@ -1,6 +1,6 @@
 /// ===============================================================================================
 /// @copyright (c) 2020 LCMonteiro                                      _|           _)
-/// @file fusion.cpp                                                    _| |  | (_-<  |   _ \    \. 
+/// @file fusion.cpp                                                    _| |  | (_-<  |   _ \    \ 
 /// @author Luis Monteiro                                             _|  \_,_| ___/ _| \___/ _| _|
 /// @date November 20, 2020
 /// ===============================================================================================
@@ -28,7 +28,7 @@ namespace fusion {
 /// - desctructor
 /// ===============================================================================================
 struct Element::Handler {
-    int native{-1};
+    int native;
     std::tuple<int, int> events;
     std::tuple<Process, Process, Process> binds;
 };
@@ -69,14 +69,14 @@ void Element::native(int native) {
 /// @brief
 /// this method will:
 template <>
-void Element::native(String& buf) {
+void Element::native(std::string& buf) {
     auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
     if (count <= 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
     buf.resize(count);
 }
 template <>
-void Element::native(Buffer& buf) {
+void Element::native(std::vector<std::byte>& buf) {
     auto count = ::recv(handler_->native, buf.data(), buf.size(), 0);
     if (count <= 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
@@ -87,12 +87,12 @@ void Element::native(Buffer& buf) {
 /// @brief
 /// this method will:
 template <>
-void Element::native(const String& buf) {
+void Element::native(const std::string& buf) {
     if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
 }
 template <>
-void Element::native(const Buffer& buf) {
+void Element::native(const std::vector<std::byte>& buf) {
     if (::send(handler_->native, buf.data(), buf.size(), MSG_NOSIGNAL) < 0)
         throw std::system_error(std::make_error_code(std::errc(errno)));
 }
@@ -124,7 +124,7 @@ struct Space::Handler {
 template <int i, int flags, typename Source, typename Base, typename Process>
 void await(const Source& source, const Base& base, Process& proc) {
     // update future
-    std::get<i>(source->binds) = std::move(proc);
+    std::get<i>(source->binds)   = std::move(proc);
     std::get<1>(source->events) |= flags;
 
     // update state
@@ -214,7 +214,7 @@ void Space::run() {
     // run until empty cache
     while (!handler_->cache.empty()) {
         // wait for events
-        auto count = ::epoll_wait(handler_->native, events.data(), events.size(), -1);
+        auto count = ::epoll_await(handler_->native, events.data(), events.size(), -1);
 
         // check error
         if (count < 0)
@@ -236,19 +236,17 @@ void Space::run() {
     }
 }
 
-template<typename Event>
-void await(Event, const Space::Shared& space, const Element::Shared& handler, Process&&);
 template<>
-void await(Input, const Space::Shared& space, const Element::Shared& handler, Process&& func) {
-    await<0, INPUT>(handler, space->handler_, func);
+void Space::decorate(input, const Element::Shared& handler, Process&& func) {
+    wait<0, INPUT>(handler, this->handler_, func);
 }
 template<>
-void await(Output, const Space::Shared& space, const Element::Shared& handler, Process&& func) {
-    await<1, OUTPUT>(handler, space->handler_, func);
+void Space::await(Output, const Element::Shared& handler, Process&& func) {
+    wait<1, OUTPUT>(handler, this->handler_, func);
 }
 template<>
-void await(Error, const Space::Shared& space, const Element::Shared& handler, Process&& func) {
-    await<2, ERROR>(handler, space->handler_, func);
+void Space::await(Error, const Element::Shared& handler, Process&& func) {
+    wait<2, ERROR>(handler, this->handler_, func);
 }
 
 } // namespace fusion

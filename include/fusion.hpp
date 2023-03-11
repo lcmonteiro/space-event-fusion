@@ -21,16 +21,16 @@ namespace fusion {
 /// ===============================================================================================
 /// waiting base types
 /// @brief
-template <int T>
-struct basetype {
-    constexpr static int id = T;
-    explicit basetype()     = default;
+template <int n>
+struct event {
+    constexpr static int id = n;
+    explicit event()   = default;
 };
-using Output   = basetype<1>;
-using Input    = basetype<2>;
-using Error    = basetype<3>;
-using Continue = basetype<0>;
-using Delete   = basetype<-1>;
+using Output   = event<1>;
+using Input    = event<2>;
+using Error    = event<3>;
+using Continue = event<0>;
+using Delete   = event<-1>;
 
 /// extended wainting types
 /// - Connection
@@ -54,7 +54,7 @@ namespace exception {
 using Buffer = std::vector<std::byte>;
 using String = std::string;
 
-// process
+/// process
 using Process = std::function<void()>;
 
 /// ===============================================================================================
@@ -77,8 +77,8 @@ struct Element {
 
     /// native constructor
     /// @brief
-    template <typename Native>
-    Element(Native handler);
+    template <typename... Args>
+    Element(Args... args);
 
     /// native interface
     /// @brief
@@ -96,7 +96,7 @@ struct Element {
 ///
 /// ===============================================================================================
 struct Space {
-    using Pointer = std::shared_ptr<Space>;
+    using Shared = std::shared_ptr<Space>;
     /// constructor
     /// @brief
     Space();
@@ -110,11 +110,10 @@ struct Space {
     void run();
 
   protected:
-    /// wait
-    /// @brief
-    friend void wait(Input, const Element::Shared& handler, const Pointer& space, Process&& func);
-    friend void wait(Output, const Element::Shared& handler, const Pointer& space, Process&& func);
-    friend void wait(Error, const Element::Shared& handler, const Pointer& space, Process&& func);
+    /// await
+    /// @brief async wait for a space event
+    template<typename Event>
+    friend void await(Event, const Shared& space, const Element::Shared& handler,  Process&&);
 
   private:
     struct Handler;
@@ -198,24 +197,128 @@ namespace {
                         scope->delete_(scope, scope->base_);
             }
             const Pointer scope;
+template <typename Source, typename Base>
+struct scope : Source {
+    using Shared = std::shared_ptr<scope>;
+
+    /// constructor
+    /// @brief
+    template <typename... Args>
+    scope(Base base, Args&&... args)
+      : Source(std::forward<Args>(args)...), base_(base), delete_() {}
+
+  protected:
+    /// await
+    /// @brief
+    template <typename Action, typename Callable, typename... Args>
+    friend constexpr void
+    await2(Action action, const Shared& scope, Callable func, Args&&... args) {
+        await(
+          action,
+          scope->base_,
+          scope->handler_,
+          decorate(
+            action,
+            [call = std::move(func), guard = Guard{scope}](auto... args) {
+                call(guard.scope, guard.scope->base_, std::move(args)...);
+            },
+            *scope,
+            std::forward<Args>(args)...));
+    }
+    template <typename Action, typename Callable, typename... Args>
+    friend constexpr void
+    await(Action action, const Shared& scope, Callable func, Args&&... args) {
+        await(
+          action,
+          scope->base_,
+          scope->handler_,
+          decorate(
+            action,
+            [call = std::move(func), guard = Guard{scope}](auto... args) {
+                call(guard.scope, guard.scope->base_, std::move(args)...);
+            },
+            *scope,
+            std::forward<Args>(args)...));
+    }
+
+    /// await
+    /// @brief
+    template <int n, typename Callable, typename... Args>
+    friend constexpr void
+    await(event<n> event, const Shared& scope, Callable func, Args&&... args) {
+        await(
+          event,
+          scope->base_,
+          scope->handler_,
+          [call = std::move(func), guard = Guard{scope}] {
+              call(guard.scope, guard.scope->base_);
+          });
+    }
+
+    /// wait
+    /// @brief
+    template <typename Callable, typename... Args>
+    friend constexpr void await(Delete, const Shared& scope, Callable func) {
+        scope->destroy_ = [call = std::move(func), scope] {
+            call(scope, scope->base_);
         };
+    }
 
-      private:
-        // base space
-        const Base base_;
+    /// wait
+    /// @brief recursive method until space fusion
+    template <typename Type, typename Handler, typename Callable>
+    friend constexpr void
+    await(Type event, const Shared& scope, const Handler& handler, Callable&& func) {
+        await(event, scope->base_, handler, std::forward<Callable>(func));
+    }
 
-        // callback before end
-        std::function<void(const Pointer&, const Base&)> delete_;
+  protected:
+    /// scope guard
+    /// @brief
+    struct Guard {
+        Guard(const Shared& _scope) : scope(_scope) {}
+        ~Guard() {
+            if (scope.use_count() == 1)
+                if (scope->delete_)
+                    scope->delete_(scope, scope->base_);
+        }
+        Shared scope;
     };
-    template <typename Source>
-    struct scope<Source, void> : Source {
-        using Pointer = std::shared_ptr<scope>;
-    };
-    template <typename Source, typename Base>
-    using Scope = std::shared_ptr<scope<Source, Base>>;
 
-} // namespace
+  private:
+    // base space
+    const Base base_;
+
+    // callback before end
+    std::function<void(const Shared&, const Base&)> delete_;
+};
+template <typename Source>
+struct scope<Source, void> : Source {
+    using Pointer = std::shared_ptr<scope>;
+};
+template <typename Source, typename Base>
+using Scope = std::shared_ptr<scope<Source, Base>>;
 } // namespace fusion
+
+/// ===============================================================================================
+/// type traits
+/// @brief
+///
+/// ===============================================================================================
+template<template<typename> typename T, typename S> struct is_subtype         : std::false_type {};
+template<template<typename> typename T, typename S> struct is_subtype<T,T<S>> : std::true_type  {};
+
+template<typename Return, typename Type>
+using is_callable = std::enable_if_t<
+    std::is_invocable_v<Type>,
+    Return
+>;
+
+template<typename Return, typename Type>
+using is_sharable = std::enable_if_t<
+    is_subtype<std::shared_ptr, Type>::value,
+    Return
+>;
 
 /// ===============================================================================================
 /// Build - Interfaces
@@ -251,6 +354,26 @@ constexpr void call(Scope scope, Callable func) {
 
 /// ===============================================================================================
 /// Wait - Interfaces
+/// await - interfaces
+/// @brief
+///
+/// ===============================================================================================
+template <
+    typename Type, 
+    typename Shared, 
+    typename Callable, 
+    typename... Args>
+constexpr is_sharable<void, Shared>
+await(Shared&& scope, Callable&& callable, Args&&... args) {
+    await(
+      Type(),
+      std::forward<Shared>(scope),
+      std::forward<Callable>(callable),
+      std::forward<Args>(args)...);
+}
+
+/// ===============================================================================================
+/// Call - Interfaces
 /// @brief
 /// these interfaces are responsible for connecting a callback to an event type
 /// ===============================================================================================
